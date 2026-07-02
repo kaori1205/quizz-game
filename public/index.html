@@ -3,9 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Live!CEM</title>
+<title>Live!QUIZZ</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
   :root{
     --bg:#FAFAFF; --panel:#FFFFFF; --panel-2:#F4F1FF; --line:rgba(36,27,77,0.10);
@@ -39,14 +40,27 @@
   input:focus{border-color:var(--primary-2);}
   label{font-size:13px; color:var(--text-dim); font-weight:600; margin-bottom:4px; display:block;}
   .role-pick{display:grid; grid-template-columns:1fr 1fr; gap:14px; width:100%;}
-  .role-btn{background:var(--panel-2); border:2px solid transparent; border-radius:18px; padding:28px 14px; display:flex; flex-direction:column; align-items:center; gap:10px; cursor:pointer; color:var(--text); transition:transform .15s,border-color .15s,box-shadow .15s;}
-  .role-btn:hover{border-color:var(--primary); transform:translateY(-3px); box-shadow:0 10px 24px -10px rgba(139,92,246,0.4);}
-  .role-btn .emoji{font-size:36px;}
+  .role-btn{border:none; border-radius:18px; padding:32px 14px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; cursor:pointer; text-align:center; transition:transform .15s,box-shadow .15s; font-family:Arial,sans-serif; font-weight:700; font-size:19px;}
+  .role-btn:hover{transform:translateY(-3px);}
+  .role-btn:active{transform:translateY(2px);}
+  .role-btn.host{background:linear-gradient(135deg,#8B5CF6,#6D28D9); color:#fff; box-shadow:0 8px 0 0 #5321A8;}
+  .role-btn.host:active{box-shadow:0 3px 0 0 #5321A8;}
+  .role-btn.player{background:linear-gradient(135deg,#FFD966,var(--gold)); color:#241B4D; box-shadow:0 8px 0 0 #E0A800;}
+  .role-btn.player:active{box-shadow:0 3px 0 0 #E0A800;}
   .code-plaque{font-family:Arial,sans-serif; font-weight:700; font-size:44px; letter-spacing:8px; background:rgba(0,0,0,.3); border:1px dashed var(--primary-2); border-radius:14px; padding:14px 10px; color:var(--gold);}
   .badge{display:inline-flex; align-items:center; gap:6px; background:rgba(45,212,191,.14); color:var(--teal); border:1px solid rgba(45,212,191,.35); font-weight:600; font-size:13px; padding:5px 11px; border-radius:999px;}
   .badge.dim{background:rgba(169,164,217,.12); color:var(--text-dim); border-color:var(--line);}
-  .player-chip{background:var(--panel-2); border:1px solid var(--line); border-radius:10px; padding:8px 12px; font-size:14px; font-weight:600; display:flex; align-items:center; gap:6px;}
-  .player-list{display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; max-height:180px; overflow:auto;}
+  .player-chip{background:var(--panel-2); border:1px solid var(--line); border-radius:10px; padding:6px 12px 6px 6px; font-size:14px; font-weight:600; display:flex; align-items:center; gap:8px;}
+  .player-list{display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; max-height:220px; overflow:auto;}
+  .avatar{width:28px;height:28px;border-radius:50%; background:var(--primary); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12px; flex-shrink:0;}
+  .avatar.lg{width:56px;height:56px;font-size:20px;}
+  .qr-box{background:#fff; padding:12px; border-radius:14px; display:inline-flex; align-items:center; justify-content:center; margin-top:10px;}
+  .icon-picker{display:grid; grid-template-columns:repeat(6,1fr); gap:8px; margin-bottom:16px;}
+  .icon-opt{aspect-ratio:1; border-radius:10px; border:2px solid var(--line); background:var(--panel-2); color:var(--text); display:flex; align-items:center; justify-content:center; font-weight:700; cursor:pointer;}
+  .icon-opt.active{border-color:var(--primary); background:var(--primary); color:#fff;}
+  .tabs{display:flex; gap:8px; width:100%; margin-bottom:14px;}
+  .tab-btn{flex:1; padding:11px; border-radius:12px; border:1px solid var(--line); background:var(--panel-2); color:var(--text-dim); font-weight:700; cursor:pointer;}
+  .tab-btn.active{background:var(--primary); color:#fff; border-color:var(--primary);}
   .qmeta{display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;}
   .timer-ring{position:relative; width:64px; height:64px;}
   .timer-ring svg{transform:rotate(-90deg);}
@@ -54,9 +68,11 @@
   .timer-num{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-family:Arial,sans-serif; font-weight:700; font-size:20px;}
   .question-text{font-family:Arial,sans-serif; font-size:24px; font-weight:600; line-height:1.35; margin:6px 0 18px;}
   .opts{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
-  .opt{display:flex; align-items:center; gap:10px; border-radius:14px; padding:18px 16px; font-family:Arial,sans-serif; font-weight:600; font-size:16px; color:#fff; cursor:pointer; border:none; text-align:left; min-height:64px;}
-  .opt.red{background:var(--a-red);} .opt.blue{background:var(--a-blue);} .opt.yellow{background:var(--a-yellow);} .opt.green{background:var(--a-green);}
-  .opt:disabled{opacity:.5; cursor:default;}
+  .opt{display:flex; align-items:center; gap:10px; border-radius:14px; padding:18px 16px; font-family:Arial,sans-serif; font-weight:700; font-size:16px; color:#fff; cursor:pointer; border:none; text-align:left; min-height:64px; transition:transform .12s,box-shadow .12s,opacity .12s;}
+  .opt.red{background:var(--a-red); box-shadow:0 6px 0 0 #C23140;} .opt.blue{background:var(--a-blue); box-shadow:0 6px 0 0 #1560B0;} .opt.yellow{background:var(--a-yellow); box-shadow:0 6px 0 0 #C98600;} .opt.green{background:var(--a-green); box-shadow:0 6px 0 0 #1F9E5A;}
+  .opt:not(:disabled):hover{transform:translateY(-2px);}
+  .opt:not(:disabled):active{transform:translateY(4px); box-shadow:none !important;}
+  .opt:disabled{opacity:.45; cursor:default; box-shadow:none;}
   .leader-row{display:flex; align-items:center; justify-content:space-between; background:var(--panel-2); border:1px solid var(--line); border-radius:12px; padding:12px 16px; margin-bottom:8px;}
   .leader-rank{font-family:Arial,sans-serif; font-weight:700; color:var(--text-dim); width:28px;}
   .leader-name{font-weight:600; flex:1; margin-left:6px;}
@@ -69,7 +85,7 @@
 </style>
 </head>
 <body>
-<div class="brand"><div class="logo"></div><span>Live!CEM</span></div>
+<div class="brand"><div class="logo"></div><span>Live!QUIZZ</span></div>
 <div id="app"></div>
 
 <script src="/socket.io/socket.io.js"></script>
@@ -82,9 +98,13 @@ const SHAPES = {
   yellow:`<svg width="20" height="20" viewBox="0 0 20 20"><circle cx="10" cy="10" r="8" fill="#fff"/></svg>`,
   green:`<svg width="20" height="20" viewBox="0 0 20 20"><rect x="2" y="2" width="16" height="16" rx="3" fill="#fff"/></svg>`,
 };
+const ICON_OPTS = ["A","B","C","D","E","F","G","H","I","J","K","L"];
+
+const urlParams = new URLSearchParams(location.search);
+const joinCodeFromUrl = urlParams.get("join");
 
 let state = { screen:"landing", role:null, code:"", totalQuestions:0, currentIndex:0,
-  answered:false, lastCorrect:null, lastPoints:0 };
+  answered:false, lastCorrect:null, lastPoints:0, selectedIcon: ICON_OPTS[0] };
 let tickHandle = null;
 let currentDuration = 20000, currentStart = 0;
 
@@ -105,16 +125,25 @@ function render(){
   else if(state.screen==="player_results") app.innerHTML = viewResults(false);
   else if(state.screen==="player_ended") app.innerHTML = viewEnded();
   bind();
+  if(state.screen==="host_lobby") renderQr();
+}
+
+function renderQr(){
+  const box = el("qr-box");
+  if(!box) return;
+  box.innerHTML = "";
+  const joinUrl = `${location.origin}${location.pathname}?join=${state.code}`;
+  new QRCode(box, { text: joinUrl, width: 168, height: 168, colorDark:"#241B4D", colorLight:"#ffffff" });
 }
 
 function viewLanding(){
   return `<div class="card center"><h2 style="margin-top:0">Chào mừng!</h2>
   <p class="muted">Tạo phòng để làm host, hoặc tham gia bằng mã phòng.</p>
   <div class="role-pick">
-    <div class="role-btn" id="pick-host"><div class="emoji">🎛️</div><b>Tạo phòng (Host)</b><small>Điều khiển game</small></div>
-    <div class="role-btn" id="pick-player"><div class="emoji">🙋</div><b>Tham gia chơi</b><small>Nhập mã & thi đấu</small></div>
+    <div class="role-btn host" id="pick-host">Tạo phòng (Host)</div>
+    <div class="role-btn player" id="pick-player">Tham gia chơi</div>
   </div>
-  <a href="/history.html" style="text-decoration:none"><button class="secondary block" style="margin-top:14px">📜 Lịch sử trận đấu</button></a>
+  <button class="secondary block" id="pick-history" style="margin-top:14px">Lịch sử trận đấu</button>
   </div>`;
 }
 function viewHostSetup(){
@@ -124,13 +153,15 @@ function viewHostSetup(){
 }
 function viewHostLobby(){
   return `<div class="card center">
-  <div class="badge">🟢 Đang mở phòng</div>
+  <div class="badge">Đang mở phòng</div>
   <h3 style="margin:10px 0 4px">Mọi người vào bằng mã:</h3>
   <div class="code-plaque">${state.code}</div>
-  <p class="muted" id="lobby-count" style="margin-top:14px">Đang chờ người chơi…</p>
+  <div class="qr-box" id="qr-box"></div>
+  <p class="muted" style="margin-top:8px">Hoặc quét mã QR để vào thẳng phòng</p>
+  <p class="muted" id="lobby-count" style="margin-top:10px">Đang chờ người chơi…</p>
   <div class="player-list" id="lobby-players"></div>
   <div class="divider"></div>
-  <button class="primary block" id="start-game">▶️ Bắt đầu (${state.totalQuestions} câu)</button>
+  <button class="primary block" id="start-game">Bắt đầu (${state.totalQuestions} câu)</button>
   </div>`;
 }
 function viewQuestion(isHost){
@@ -147,57 +178,69 @@ function viewQuestion(isHost){
     ${state.options.map((o,i)=>`<button class="opt ${OPT_CLASSES[i]}" data-choice="${i}" ${isHost||state.answered?"disabled":""} style="${isHost?"cursor:default":""}">${SHAPES[OPT_CLASSES[i]]}<span>${esc(o)}</span></button>`).join("")}
   </div>
   ${isHost
-    ? `<div class="divider"></div><p class="muted center" id="answered-count">0 người đã trả lời</p><button class="primary block" id="force-end">⏭️ Kết thúc câu hỏi ngay</button>`
-    : `<p class="muted center" style="margin-top:14px">${state.answered?"✅ Đã gửi đáp án — chờ kết quả…":"Chọn một đáp án"}</p>`}
+    ? `<div class="divider"></div><p class="muted center" id="answered-count">0 người đã trả lời</p><button class="primary block" id="force-end">Kết thúc câu hỏi ngay</button>`
+    : `<p class="muted center" style="margin-top:14px">${state.answered?"Đã gửi đáp án — chờ kết quả…":"Chọn một đáp án"}</p>`}
   </div>`;
 }
 function viewResults(isHost){
   const banner = state.lastCorrect===null ? "" :
-    state.lastCorrect ? `<div class="result-banner ok">🎉 Chính xác! +${state.lastPoints} điểm</div>`
-                       : `<div class="result-banner no">❌ Sai rồi! +0 điểm</div>`;
+    state.lastCorrect ? `<div class="result-banner ok">Chính xác! +${state.lastPoints} điểm</div>`
+                       : `<div class="result-banner no">Sai rồi! +0 điểm</div>`;
   return `<div class="card">
   ${isHost?"":banner}
-  <h3 style="margin-top:0" class="center">📊 Bảng xếp hạng</h3>
+  <h3 style="margin-top:0" class="center">Bảng xếp hạng</h3>
   <div id="leaderboard">${renderLeaderboard(state.leaderboard)}</div>
   <div class="divider"></div>
   ${isHost
-    ? `<button class="primary block" id="next-question">${state.currentIndex+1<state.totalQuestions?"➡️ Câu tiếp theo":"🏁 Kết thúc trò chơi"}</button>`
+    ? `<button class="primary block" id="next-question">${state.currentIndex+1<state.totalQuestions?"Câu tiếp theo":"Kết thúc trò chơi"}</button>`
     : `<p class="muted center">Đang chờ host chuyển câu tiếp theo…</p>`}
   </div>`;
 }
 function viewEnded(){
   const reportBtn = state.gameId
-    ? `<a href="/api/games/${state.gameId}/report.csv" style="text-decoration:none"><button class="primary block">📥 Tải báo cáo chi tiết (CSV)</button></a>`
+    ? `<a href="/api/games/${state.gameId}/report.csv" style="text-decoration:none"><button class="primary block">Tải báo cáo chi tiết (CSV)</button></a>`
     : "";
-  return `<div class="card center"><h2 style="margin-top:0">🏁 Kết quả chung cuộc</h2>
+  return `<div class="card center"><h2 style="margin-top:0">Kết quả chung cuộc</h2>
   <div id="leaderboard-final">${renderLeaderboard(state.leaderboard)}</div>
   <div class="divider"></div>
   ${reportBtn}
   <button class="secondary block" id="back-landing" style="margin-top:10px">Về trang chủ</button></div>`;
 }
 function viewPlayerJoin(){
+  const codeLocked = !!joinCodeFromUrl;
   return `<div class="card"><h2 style="margin-top:0">Tham gia phòng</h2>
-  <label>Mã phòng</label><input id="join-code" placeholder="VD: 1234" maxlength="6" style="margin-bottom:14px"/>
+  <label>Mã phòng</label>
+  <input id="join-code" placeholder="VD: 1234" maxlength="6" style="margin-bottom:14px" value="${esc(state.code||joinCodeFromUrl||"")}" ${codeLocked?"disabled":""}/>
   <label>Tên hiển thị</label><input id="join-name" placeholder="Biệt danh của bạn" maxlength="18" style="margin-bottom:16px"/>
+  <label>Chọn icon nhân vật</label>
+  <div class="icon-picker" id="icon-picker">
+    ${ICON_OPTS.map(ic=>`<div class="icon-opt ${ic===state.selectedIcon?"active":""}" data-icon="${ic}">${ic}</div>`).join("")}
+  </div>
   <p class="muted" id="join-error" style="color:#DC2626"></p>
   <button class="primary block" id="do-join">Tham gia ngay</button></div>`;
 }
 function viewPlayerWait(){
-  return `<div class="card center"><div class="badge">✅ Đã vào phòng ${state.code}</div>
-  <p class="muted" style="margin-top:14px">Đang chờ host bắt đầu trò chơi…</p>
-  <div style="font-size:38px; margin-top:10px">⏳</div></div>`;
+  return `<div class="card center"><div class="badge">Đã vào phòng ${state.code}</div>
+  <div class="avatar lg" style="margin:18px auto 0">${esc(state.selectedIcon)}</div>
+  <p class="muted" style="margin-top:14px">Đang chờ host bắt đầu trò chơi…</p></div>`;
 }
 function renderLeaderboard(list){
   if(!list || list.length===0) return `<p class="muted center">Chưa có người chơi nào.</p>`;
-  const medals=["🥇","🥈","🥉"];
-  return list.map((p,i)=>`<div class="leader-row"><div class="leader-rank">${medals[i]||(i+1)}</div><div class="leader-name">${esc(p.name)}</div><div class="leader-score">${p.score}</div></div>`).join("");
+  return list.map((p,i)=>`<div class="leader-row"><div class="leader-rank">${i+1}</div><div class="avatar" style="margin-right:8px">${esc(p.icon||p.name.slice(0,1).toUpperCase())}</div><div class="leader-name">${esc(p.name)}</div><div class="leader-score">${p.score}</div></div>`).join("");
 }
 
 function bind(){
   const b=(id,fn)=>{ const n=el(id); if(n) n.onclick=fn; };
   b("pick-host", ()=>{ state.screen="host_setup"; render(); });
   b("pick-player", ()=>{ state.screen="player_join"; render(); });
-  b("back-landing", ()=>{ location.reload(); });
+  b("pick-history", ()=>{ location.href="/history.html"; });
+  b("back-landing", ()=>{ location.href = location.pathname; });
+  document.querySelectorAll(".icon-opt").forEach(node=>{
+    node.onclick=()=>{
+      state.selectedIcon = node.dataset.icon;
+      document.querySelectorAll(".icon-opt").forEach(n=>n.classList.toggle("active", n===node));
+    };
+  });
   b("create-room", ()=>{
     socket.emit("host:create", {}, (res)=>{
       if(!res.ok) return;
@@ -213,7 +256,7 @@ function bind(){
     const name=(el("join-name").value||"").trim();
     const err=el("join-error"); err.innerText="";
     if(!code||!name){ err.innerText="Nhập đầy đủ mã phòng và tên."; return; }
-    socket.emit("player:join", {code,name}, (res)=>{
+    socket.emit("player:join", {code, name, icon: state.selectedIcon}, (res)=>{
       if(!res.ok){ err.innerText=res.error; return; }
       state.role="player"; state.code=code; state.totalQuestions=res.totalQuestions;
       state.screen="player_wait"; render();
@@ -246,8 +289,8 @@ function startTimerLoop(){
 
 // ---- Socket events ----
 socket.on("lobby:update", ({players})=>{
-  const c = el("lobby-count"); if(c) c.innerText = players.length? `🎉 ${players.length} người đã tham gia` : "Đang chờ người chơi…";
-  const l = el("lobby-players"); if(l) l.innerHTML = players.map(n=>`<div class="player-chip">🙋 ${esc(n)}</div>`).join("");
+  const c = el("lobby-count"); if(c) c.innerText = players.length? `${players.length} người đã tham gia` : "Đang chờ người chơi…";
+  const l = el("lobby-players"); if(l) l.innerHTML = players.map(p=>`<div class="player-chip"><div class="avatar">${esc(p.icon||p.name.slice(0,1).toUpperCase())}</div>${esc(p.name)}</div>`).join("");
 });
 
 socket.on("game:question", (data)=>{
@@ -281,6 +324,10 @@ socket.on("game:ended", ({leaderboard, gameId})=>{
   render();
 });
 
+if(joinCodeFromUrl){
+  state.code = joinCodeFromUrl;
+  state.screen = "player_join";
+}
 render();
 </script>
 </body>

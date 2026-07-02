@@ -34,6 +34,13 @@ app.get("/api/games/:id/detail", (req, res) => {
   res.json(g);
 });
 
+app.get("/api/rooms/:code", (req, res) => {
+  const room = rooms[req.params.code];
+  if (!room) return res.status(404).json({ ok: false, error: "Không tìm thấy phòng với mã này." });
+  if (room.phase !== "lobby") return res.json({ ok: false, error: "Phòng đã bắt đầu chơi, không thể vào lúc này." });
+  res.json({ ok: true, code: req.params.code });
+});
+
 app.get("/api/games/:id/report.csv", (req, res) => {
   const g = db.getGame(req.params.id);
   if (!g) return res.status(404).send("Không tìm thấy trận đấu.");
@@ -116,18 +123,21 @@ io.on("connection", (socket) => {
   });
 
   // ---- PLAYER: tham gia phòng ----
-  socket.on("player:join", ({ code, name }, cb) => {
+  socket.on("player:join", ({ code, name, icon }, cb) => {
     const room = rooms[code];
     if (!room) return cb({ ok: false, error: "Không tìm thấy phòng với mã này." });
     if (room.phase !== "lobby") return cb({ ok: false, error: "Phòng đã bắt đầu chơi, không thể vào lúc này." });
 
-    room.players[socket.id] = { name: name.slice(0, 20), score: 0 };
+    const safeIcon = typeof icon === "string" ? icon.slice(0, 2).toUpperCase() : (name || "?").slice(0, 1).toUpperCase();
+    room.players[socket.id] = { name: name.slice(0, 20), icon: safeIcon, score: 0 };
     socket.join(code);
     socket.data.role = "player";
     socket.data.roomCode = code;
 
     cb({ ok: true, code, totalQuestions: room.questions.length });
-    io.to(code).emit("lobby:update", { players: Object.values(room.players).map((p) => p.name) });
+    io.to(code).emit("lobby:update", {
+      players: Object.values(room.players).map((p) => ({ name: p.name, icon: p.icon })),
+    });
   });
 
   // ---- HOST: bắt đầu game ----
@@ -191,7 +201,9 @@ io.on("connection", (socket) => {
       // để điểm số và lịch sử trả lời của người đó không bị mất khỏi báo cáo cuối trận.
       if (room.phase === "lobby") {
         delete room.players[socket.id];
-        io.to(code).emit("lobby:update", { players: Object.values(room.players).map((p) => p.name) });
+        io.to(code).emit("lobby:update", {
+          players: Object.values(room.players).map((p) => ({ name: p.name, icon: p.icon })),
+        });
       }
     }
     // Nếu host rời đi, phòng vẫn giữ nguyên trong bộ nhớ cho tới khi server restart (demo đơn giản).
