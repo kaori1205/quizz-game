@@ -34,11 +34,48 @@ app.get("/api/games/:id/detail", (req, res) => {
   res.json(g);
 });
 
+app.delete("/api/games/:id", (req, res) => {
+  const ok = db.deleteGame(req.params.id);
+  if (!ok) return res.status(404).json({ error: "Không tìm thấy trận đấu." });
+  res.json({ ok: true });
+});
+
 app.get("/api/rooms/:code", (req, res) => {
   const room = rooms[req.params.code];
   if (!room) return res.status(404).json({ ok: false, error: "Không tìm thấy phòng với mã này." });
   if (room.phase !== "lobby") return res.json({ ok: false, error: "Phòng đã bắt đầu chơi, không thể vào lúc này." });
   res.json({ ok: true, code: req.params.code });
+});
+
+// ---- API: bộ câu hỏi (đề thi có thể lưu và tái sử dụng) ----
+app.get("/api/question-sets", (req, res) => {
+  res.json(db.listQuestionSets());
+});
+
+app.get("/api/question-sets/:id", (req, res) => {
+  const set = db.getQuestionSet(req.params.id);
+  if (!set) return res.status(404).json({ error: "Không tìm thấy bộ câu hỏi." });
+  res.json(set);
+});
+
+app.post("/api/question-sets", (req, res) => {
+  const { name, duration, questions } = req.body || {};
+  const set = db.createQuestionSet({ name, duration, questions });
+  if (!set) return res.status(400).json({ error: "Cần ít nhất 1 câu hỏi hợp lệ (có đủ 4 đáp án)." });
+  res.json(set);
+});
+
+app.put("/api/question-sets/:id", (req, res) => {
+  const { name, duration, questions } = req.body || {};
+  const set = db.updateQuestionSet(req.params.id, { name, duration, questions });
+  if (!set) return res.status(400).json({ error: "Không tìm thấy bộ câu hỏi hoặc dữ liệu không hợp lệ." });
+  res.json(set);
+});
+
+app.delete("/api/question-sets/:id", (req, res) => {
+  const ok = db.deleteQuestionSet(req.params.id);
+  if (!ok) return res.status(404).json({ error: "Không tìm thấy bộ câu hỏi." });
+  res.json({ ok: true });
 });
 
 app.get("/api/games/:id/report.csv", (req, res) => {
@@ -102,16 +139,27 @@ function leaderboard(room) {
 
 io.on("connection", (socket) => {
   // ---- HOST: tạo phòng ----
-  socket.on("host:create", (_, cb) => {
+  socket.on("host:create", (payload, cb) => {
+    const questionSetId = payload && payload.questionSetId;
     let code;
     do { code = genCode(); } while (rooms[code]);
 
+    let questions = DEFAULT_QUESTIONS;
+    let duration = QUESTION_DURATION;
+    if (questionSetId) {
+      const set = db.getQuestionSet(questionSetId);
+      if (set && Array.isArray(set.questions) && set.questions.length > 0) {
+        questions = set.questions;
+        if (set.duration > 0) duration = set.duration * 1000;
+      }
+    }
+
     rooms[code] = {
-      questions: DEFAULT_QUESTIONS,
+      questions,
       currentIndex: -1,
       phase: "lobby",
       phaseStartTime: 0,
-      duration: QUESTION_DURATION,
+      duration,
       hostSocketId: socket.id,
       players: {},
       answers: {},
@@ -119,7 +167,7 @@ io.on("connection", (socket) => {
     socket.join(code);
     socket.data.role = "host";
     socket.data.roomCode = code;
-    cb({ ok: true, code, totalQuestions: DEFAULT_QUESTIONS.length });
+    cb({ ok: true, code, totalQuestions: questions.length });
   });
 
   // ---- PLAYER: tham gia phòng ----

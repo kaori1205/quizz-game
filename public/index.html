@@ -295,11 +295,21 @@ const urlParams = new URLSearchParams(location.search);
 const joinCodeFromUrl = urlParams.get("join");
 
 let state = { screen:"landing", role:null, code:"", totalQuestions:0, currentIndex:0,
-  answered:false, lastCorrect:null, lastPoints:0, selectedIcon: ICON_OPTS[0] };
+  answered:false, lastCorrect:null, lastPoints:0, selectedIcon: ICON_OPTS[0], questionSets:[] };
 let tickHandle = null;
 let currentDuration = 20000, currentStart = 0;
 
 function el(id){ return document.getElementById(id); }
+
+function loadQuestionSets(){
+  fetch("/api/question-sets")
+    .then(r=>r.json())
+    .then(list=>{
+      state.questionSets = Array.isArray(list) ? list : [];
+      if(state.screen==="host_setup") render();
+    })
+    .catch(()=>{ /* giữ danh sách rỗng, vẫn dùng được bộ mặc định */ });
+}
 function esc(s){ const d=document.createElement("div"); d.innerText=s; return d.innerHTML; }
 
 function render(){
@@ -412,11 +422,20 @@ function viewLanding(){
     <div class="role-btn player" id="pick-player">Tham gia chơi</div>
   </div>
   <button class="secondary block" id="pick-history" style="margin-top:14px">Lịch sử trận đấu</button>
+  <button class="secondary block" id="pick-admin" style="margin-top:10px">Quản lý bộ câu hỏi</button>
   </div>`;
 }
 function viewHostSetup(){
+  const sets = state.questionSets || [];
+  const options = [`<option value="">Bộ mặc định (5 câu, 20s/câu)</option>`]
+    .concat(sets.map(s=>`<option value="${s.id}">${esc(s.name)} — ${s.numQuestions} câu, ${s.duration}s/câu</option>`))
+    .join("");
   return `<div class="card center"><h2 style="margin-top:0">Tạo phòng mới</h2>
   <p class="muted">Server sẽ sinh mã phòng tự động.</p>
+  <div class="field" style="text-align:left; margin:16px 0;">
+    <label style="display:block; font-weight:700; font-size:13px; margin-bottom:6px; color:var(--text-dim);">Chọn bộ câu hỏi</label>
+    <select id="question-set-select" style="width:100%; border:1px solid var(--line); border-radius:10px; padding:10px 12px; font-size:15px; font-family:Arial,sans-serif; color:var(--text); background:#fff;">${options}</select>
+  </div>
   <button class="primary block" id="create-room">Tạo phòng ngay</button></div>`;
 }
 function viewHostLobby(){
@@ -534,9 +553,10 @@ function renderLeaderboard(list, prevRankMap){
 
 function bind(){
   const b=(id,fn)=>{ const n=el(id); if(n) n.onclick=fn; };
-  b("pick-host", ()=>{ state.screen="host_setup"; render(); });
+  b("pick-host", ()=>{ state.screen="host_setup"; render(); loadQuestionSets(); });
   b("pick-player", ()=>{ state.screen="player_join"; render(); });
   b("pick-history", ()=>{ location.href="/history.html"; });
+  b("pick-admin", ()=>{ location.href="/admin.html"; });
   b("back-landing", ()=>{ location.href = location.pathname; });
   document.querySelectorAll(".icon-opt").forEach(node=>{
     node.onclick=()=>{
@@ -545,7 +565,9 @@ function bind(){
     };
   });
   b("create-room", ()=>{
-    socket.emit("host:create", {}, (res)=>{
+    const sel = el("question-set-select");
+    const questionSetId = sel && sel.value ? sel.value : undefined;
+    socket.emit("host:create", { questionSetId }, (res)=>{
       if(!res.ok) return;
       state.role="host"; state.code=res.code; state.totalQuestions=res.totalQuestions;
       state.screen="host_lobby"; render();
