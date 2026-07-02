@@ -3,41 +3,46 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Đấu Trường Tri Thức — Live</title>
+<title>Live!CEM</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg:#12102B; --panel:#1E1B4B; --panel-2:#262261; --line:rgba(255,255,255,0.08);
-    --text:#F4F2FF; --text-dim:#A9A4D9; --primary:#7C5CFC; --primary-2:#9B7FFF;
-    --gold:#FFC93C; --teal:#2DD4BF;
-    --a-red:#E5484D; --a-blue:#3B82F6; --a-yellow:#EAB308; --a-green:#22C55E;
-    --radius:18px;
+    --bg:#FAFAFF; --panel:#FFFFFF; --panel-2:#F4F1FF; --line:rgba(36,27,77,0.10);
+    --text:#241B4D; --text-dim:#6E6693; --primary:#8B5CF6; --primary-2:#A78BFA;
+    --gold:#FFC93C; --teal:#12B886;
+    --a-red:#FF4757; --a-blue:#1E90FF; --a-yellow:#FFC107; --a-green:#2ED573;
+    --radius:20px;
   }
   *{box-sizing:border-box;}
-  body{margin:0; background:radial-gradient(1200px 600px at 50% -10%, #29236b 0%, var(--bg) 60%); color:var(--text); font-family:'Inter',sans-serif; min-height:100vh; display:flex; flex-direction:column; align-items:center; padding:24px 16px 60px;}
-  h1,h2,h3{font-family:'Fredoka',sans-serif;}
-  #app{width:100%; max-width:720px; display:flex; flex-direction:column; align-items:center; gap:18px;}
-  .brand{display:flex; align-items:center; gap:10px;}
-  .brand .logo{width:34px;height:34px;border-radius:9px; background:conic-gradient(from 220deg,var(--a-red),var(--a-yellow),var(--a-green),var(--a-blue),var(--a-red)); box-shadow:0 0 22px rgba(124,92,252,0.55);}
-  .brand span{font-family:'Fredoka'; font-weight:700; font-size:20px;}
-  .card{width:100%; background:linear-gradient(180deg,var(--panel),var(--panel-2)); border:1px solid var(--line); border-radius:var(--radius); padding:28px; box-shadow:0 20px 50px -20px rgba(0,0,0,0.6);}
+  body{margin:0; position:relative; overflow-x:hidden; background:linear-gradient(135deg,#6D28D9 0%,#8B5CF6 45%,#A855F7 100%); color:var(--text); font-family:Arial,sans-serif; min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:40px 16px;}
+  body::before{content:"";position:fixed; top:-220px; right:-160px; width:500px; height:500px; border-radius:50%; background:radial-gradient(circle at 30% 30%, rgba(255,255,255,0.16), transparent 70%); pointer-events:none;}
+  body::after{content:"";position:fixed; bottom:-260px; left:-200px; width:600px; height:600px; border-radius:50%; background:radial-gradient(circle at 70% 70%, rgba(255,255,255,0.12), transparent 70%); pointer-events:none;}
+  h1,h2,h3{font-family:Arial,sans-serif;}
+  #app{width:100%; max-width:480px; display:flex; flex-direction:column; align-items:center; gap:18px; position:relative; z-index:1;}
+  .brand{display:flex; align-items:center; gap:2px; margin-bottom:6px;}
+  .brand .logo{width:44px;height:44px;border-radius:12px; background:#fff; box-shadow:0 4px 18px rgba(0,0,0,0.25); display:flex; align-items:center; justify-content:center; overflow:hidden; transform:rotate(-6deg);}
+  .brand .logo::after{content:"V"; font-family:'Luckiest Guy',cursive; font-weight:400; font-size:32px; line-height:1; color:#0B2E6B; display:inline-block; transform:scaleY(1.5);}
+  .brand span{font-family:'Luckiest Guy',cursive; font-weight:400; font-size:34px; letter-spacing:1px; color:#fff; text-shadow:0 2px 10px rgba(0,0,0,0.2);}
+  .card{width:100%; background:var(--panel); border:none; border-radius:var(--radius); padding:32px 28px; box-shadow:0 24px 48px -12px rgba(30,10,70,0.35);}
   .center{text-align:center;}
   .row{display:flex; gap:12px; flex-wrap:wrap;}
-  button{font-family:'Fredoka'; font-weight:600; font-size:16px; border:none; border-radius:12px; cursor:pointer; padding:14px 20px; color:#12102B; background:var(--gold); transition:transform .12s,box-shadow .12s,opacity .12s;}
+  button{font-family:Arial,sans-serif; font-weight:700; font-size:16px; border:none; border-radius:14px; cursor:pointer; padding:14px 20px; color:#241B4D; background:var(--gold); box-shadow:0 6px 0 0 #E0A800; transition:transform .12s,box-shadow .12s,opacity .12s;}
   button:hover{transform:translateY(-2px);}
-  button:disabled{opacity:.45; cursor:not-allowed; transform:none;}
-  button.secondary{background:transparent; color:var(--text); border:1px solid var(--line);}
-  button.primary{background:var(--primary); color:#fff;}
+  button:active{transform:translateY(2px); box-shadow:0 2px 0 0 #E0A800;}
+  button:disabled{opacity:.45; cursor:not-allowed; transform:none; box-shadow:none;}
+  button.secondary{background:var(--panel-2); color:var(--text); border:1px solid var(--line); box-shadow:none;}
+  button.primary{background:var(--primary); color:#fff; box-shadow:0 6px 0 0 #6D3FE0;}
+  button.primary:active{box-shadow:0 2px 0 0 #6D3FE0;}
   button.block{width:100%;}
-  input{font-family:'Inter'; font-size:16px; color:var(--text); background:rgba(0,0,0,.25); border:1px solid var(--line); border-radius:12px; padding:13px 14px; outline:none; width:100%;}
+  input{font-family:Arial,sans-serif; font-size:16px; color:var(--text); background:#F7F6FE; border:1px solid var(--line); border-radius:12px; padding:13px 14px; outline:none; width:100%;}
   input:focus{border-color:var(--primary-2);}
   label{font-size:13px; color:var(--text-dim); font-weight:600; margin-bottom:4px; display:block;}
   .role-pick{display:grid; grid-template-columns:1fr 1fr; gap:14px; width:100%;}
-  .role-btn{background:var(--panel-2); border:1px solid var(--line); border-radius:16px; padding:26px 16px; display:flex; flex-direction:column; align-items:center; gap:8px; cursor:pointer; color:var(--text);}
-  .role-btn:hover{border-color:var(--primary-2); transform:translateY(-2px);}
-  .role-btn .emoji{font-size:32px;}
-  .code-plaque{font-family:'Fredoka'; font-weight:700; font-size:44px; letter-spacing:8px; background:rgba(0,0,0,.3); border:1px dashed var(--primary-2); border-radius:14px; padding:14px 10px; color:var(--gold);}
+  .role-btn{background:var(--panel-2); border:2px solid transparent; border-radius:18px; padding:28px 14px; display:flex; flex-direction:column; align-items:center; gap:10px; cursor:pointer; color:var(--text); transition:transform .15s,border-color .15s,box-shadow .15s;}
+  .role-btn:hover{border-color:var(--primary); transform:translateY(-3px); box-shadow:0 10px 24px -10px rgba(139,92,246,0.4);}
+  .role-btn .emoji{font-size:36px;}
+  .code-plaque{font-family:Arial,sans-serif; font-weight:700; font-size:44px; letter-spacing:8px; background:rgba(0,0,0,.3); border:1px dashed var(--primary-2); border-radius:14px; padding:14px 10px; color:var(--gold);}
   .badge{display:inline-flex; align-items:center; gap:6px; background:rgba(45,212,191,.14); color:var(--teal); border:1px solid rgba(45,212,191,.35); font-weight:600; font-size:13px; padding:5px 11px; border-radius:999px;}
   .badge.dim{background:rgba(169,164,217,.12); color:var(--text-dim); border-color:var(--line);}
   .player-chip{background:var(--panel-2); border:1px solid var(--line); border-radius:10px; padding:8px 12px; font-size:14px; font-weight:600; display:flex; align-items:center; gap:6px;}
@@ -46,25 +51,25 @@
   .timer-ring{position:relative; width:64px; height:64px;}
   .timer-ring svg{transform:rotate(-90deg);}
   .timer-ring circle{fill:none; stroke-width:6;}
-  .timer-num{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-family:'Fredoka'; font-weight:700; font-size:20px;}
-  .question-text{font-family:'Fredoka'; font-size:24px; font-weight:600; line-height:1.35; margin:6px 0 18px;}
+  .timer-num{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-family:Arial,sans-serif; font-weight:700; font-size:20px;}
+  .question-text{font-family:Arial,sans-serif; font-size:24px; font-weight:600; line-height:1.35; margin:6px 0 18px;}
   .opts{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
-  .opt{display:flex; align-items:center; gap:10px; border-radius:14px; padding:18px 16px; font-family:'Fredoka'; font-weight:600; font-size:16px; color:#fff; cursor:pointer; border:none; text-align:left; min-height:64px;}
+  .opt{display:flex; align-items:center; gap:10px; border-radius:14px; padding:18px 16px; font-family:Arial,sans-serif; font-weight:600; font-size:16px; color:#fff; cursor:pointer; border:none; text-align:left; min-height:64px;}
   .opt.red{background:var(--a-red);} .opt.blue{background:var(--a-blue);} .opt.yellow{background:var(--a-yellow);} .opt.green{background:var(--a-green);}
   .opt:disabled{opacity:.5; cursor:default;}
   .leader-row{display:flex; align-items:center; justify-content:space-between; background:var(--panel-2); border:1px solid var(--line); border-radius:12px; padding:12px 16px; margin-bottom:8px;}
-  .leader-rank{font-family:'Fredoka'; font-weight:700; color:var(--text-dim); width:28px;}
+  .leader-rank{font-family:Arial,sans-serif; font-weight:700; color:var(--text-dim); width:28px;}
   .leader-name{font-weight:600; flex:1; margin-left:6px;}
-  .leader-score{font-family:'Fredoka'; font-weight:700; color:var(--gold);}
+  .leader-score{font-family:Arial,sans-serif; font-weight:700; color:var(--gold);}
   .muted{color:var(--text-dim); font-size:14px;}
   .divider{height:1px; background:var(--line); margin:18px 0;}
-  .result-banner{text-align:center; padding:18px; border-radius:14px; margin-bottom:16px; font-family:'Fredoka'; font-weight:700; font-size:20px;}
-  .result-banner.ok{background:rgba(34,197,94,.15); color:#4ADE80; border:1px solid rgba(34,197,94,.4);}
-  .result-banner.no{background:rgba(229,72,77,.15); color:#F87171; border:1px solid rgba(229,72,77,.4);}
+  .result-banner{text-align:center; padding:18px; border-radius:14px; margin-bottom:16px; font-family:Arial,sans-serif; font-weight:700; font-size:20px;}
+  .result-banner.ok{background:rgba(34,197,94,.14); color:#16A34A; border:1px solid rgba(34,197,94,.35);}
+  .result-banner.no{background:rgba(255,71,87,.12); color:#DC2626; border:1px solid rgba(255,71,87,.35);}
 </style>
 </head>
 <body>
-<div class="brand"><div class="logo"></div><span>Đấu Trường Tri Thức — Live</span></div>
+<div class="brand"><div class="logo"></div><span>Live!CEM</span></div>
 <div id="app"></div>
 
 <script src="/socket.io/socket.io.js"></script>
@@ -133,7 +138,7 @@ function viewQuestion(isHost){
   <div class="qmeta">
     <div class="badge">Câu ${state.currentIndex+1}/${state.totalQuestions}</div>
     <div class="timer-ring"><svg width="64" height="64" viewBox="0 0 64 64">
-      <circle cx="32" cy="32" r="28" stroke="rgba(255,255,255,.12)"></circle>
+      <circle cx="32" cy="32" r="28" stroke="rgba(36,27,77,.10)"></circle>
       <circle id="ring" cx="32" cy="32" r="28" stroke="var(--gold)" stroke-dasharray="176" stroke-dashoffset="0" stroke-linecap="round"></circle>
     </svg><div class="timer-num" id="timer-num">--</div></div>
   </div>
@@ -174,7 +179,7 @@ function viewPlayerJoin(){
   return `<div class="card"><h2 style="margin-top:0">Tham gia phòng</h2>
   <label>Mã phòng</label><input id="join-code" placeholder="VD: 1234" maxlength="6" style="margin-bottom:14px"/>
   <label>Tên hiển thị</label><input id="join-name" placeholder="Biệt danh của bạn" maxlength="18" style="margin-bottom:16px"/>
-  <p class="muted" id="join-error" style="color:#F87171"></p>
+  <p class="muted" id="join-error" style="color:#DC2626"></p>
   <button class="primary block" id="do-join">Tham gia ngay</button></div>`;
 }
 function viewPlayerWait(){
@@ -207,7 +212,7 @@ function bind(){
     const code=(el("join-code").value||"").trim();
     const name=(el("join-name").value||"").trim();
     const err=el("join-error"); err.innerText="";
-    if(!code||!name){ err.innerText="Vui lòng nhập đầy đủ mã phòng và tên."; return; }
+    if(!code||!name){ err.innerText="Nhập đầy đủ mã phòng và tên."; return; }
     socket.emit("player:join", {code,name}, (res)=>{
       if(!res.ok){ err.innerText=res.error; return; }
       state.role="player"; state.code=code; state.totalQuestions=res.totalQuestions;
