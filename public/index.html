@@ -83,7 +83,15 @@
   .opt:not(:disabled):hover{transform:translateY(-2px);}
   .opt:not(:disabled):active{transform:translateY(4px); box-shadow:none !important;}
   .opt:disabled{opacity:.45; cursor:default; box-shadow:none;}
-  .leader-row{display:flex; align-items:center; justify-content:space-between; background:var(--panel-2); border:1px solid var(--line); border-radius:12px; padding:12px 16px; margin-bottom:8px;}
+  .leader-row{display:flex; align-items:center; justify-content:space-between; background:var(--panel-2); border:1px solid var(--line); border-radius:12px; padding:12px 16px; margin-bottom:8px; animation:rowIn .5s ease both;}
+  .leader-row.top1{background:linear-gradient(90deg,rgba(255,201,60,.28),rgba(255,201,60,.06)); border-color:rgba(255,201,60,.55); box-shadow:0 6px 16px rgba(255,201,60,.22);}
+  .leader-row.top2{background:linear-gradient(90deg,rgba(148,163,184,.28),rgba(148,163,184,.06)); border-color:rgba(148,163,184,.5);}
+  .leader-row.top3{background:linear-gradient(90deg,rgba(217,119,6,.24),rgba(217,119,6,.06)); border-color:rgba(217,119,6,.45);}
+  @keyframes rowIn{from{opacity:0; transform:translateX(-28px);} to{opacity:1; transform:translateX(0);}}
+  .rank-change{font-family:Arial,sans-serif; font-size:13px; font-weight:800; margin:0 6px; min-width:14px; text-align:center;}
+  .rank-change.up{color:#22C55E;}
+  .rank-change.down{color:#EF4444;}
+  .rank-change.same{color:var(--text-dim); opacity:.5;}
   .leader-rank{font-family:Arial,sans-serif; font-weight:700; color:var(--text-dim); width:28px;}
   .leader-name{font-weight:600; flex:1; margin-left:6px;}
   .leader-score{font-family:Arial,sans-serif; font-weight:700; color:var(--gold);}
@@ -133,14 +141,75 @@
     body::after{width:380px; height:380px; bottom:-160px; left:-140px;}
   }
 
+  /* ===== HOST STAGE MODE: card pinned to fixed offsets from the screen edges (no scroll, no drift) ===== */
+  body.host-stage{height:100dvh; height:100vh; padding:0; overflow:hidden;}
+  body.host-stage .brand{
+    position:fixed;
+    top:max(10px, env(safe-area-inset-top));
+    left:max(10px, env(safe-area-inset-left));
+    z-index:5; margin:0; gap:6px;
+    background:rgba(36,27,77,.85);
+    padding:6px 12px 6px 6px;
+    border-radius:999px;
+    box-shadow:0 6px 16px rgba(0,0,0,.28);
+    backdrop-filter:blur(2px);
+  }
+  body.host-stage .brand .logo{width:24px; height:24px; border-radius:8px;}
+  body.host-stage .brand span.title{font-size:15px; letter-spacing:0.5px;}
+  body.host-stage #app{
+    position:fixed;
+    top:max(100px, env(safe-area-inset-top));
+    right:max(50px, env(safe-area-inset-right));
+    bottom:max(30px, env(safe-area-inset-bottom));
+    left:max(50px, env(safe-area-inset-left));
+    max-width:none; width:auto; height:auto; margin:0;
+    display:flex; flex-direction:column; align-items:stretch; justify-content:flex-start; gap:0;
+  }
+  body.host-stage .card{width:100%; height:100%; padding:clamp(16px,2.6vh,32px) clamp(18px,3vw,40px); border-radius:26px; overflow-y:auto;}
+  body.host-stage .qmeta{margin-bottom:clamp(8px,1.6vh,16px);}
+  body.host-stage .badge{font-size:clamp(13px,1.6vh,17px); padding:6px 14px;}
+  body.host-stage .timer-ring{width:clamp(48px,7vh,72px); height:clamp(48px,7vh,72px);}
+  body.host-stage .timer-ring svg{width:100%; height:100%;}
+  body.host-stage .timer-num{font-size:clamp(16px,2.2vh,24px);}
+  body.host-stage .question-text{font-size:clamp(20px,3.4vh,34px); margin:clamp(8px,1.6vh,16px) 0 clamp(14px,2.4vh,24px); line-height:1.25;}
+  body.host-stage .opts{gap:clamp(10px,1.6vh,18px);}
+  body.host-stage .opt{min-height:clamp(52px,8vh,84px); font-size:clamp(15px,2vh,20px); padding:clamp(12px,1.8vh,20px) 18px; border-radius:16px; gap:12px;}
+  body.host-stage .opt svg{width:clamp(16px,2vh,22px); height:clamp(16px,2vh,22px);}
+  body.host-stage .divider{margin:clamp(10px,1.6vh,18px) 0;}
+  body.host-stage #answered-count{font-size:clamp(13px,1.6vh,16px); margin:clamp(8px,1.4vh,14px) 0;}
+  body.host-stage #force-end, body.host-stage #next-question{font-size:clamp(14px,1.8vh,18px); padding:clamp(12px,1.8vh,16px) 24px;}
+  body.host-stage h3.center{font-size:clamp(18px,2.6vh,26px); margin:0 0 clamp(8px,1.4vh,14px);}
+  body.host-stage .leader-row{padding:clamp(10px,1.6vh,16px) 18px; border-radius:14px; font-size:clamp(14px,1.8vh,18px); margin-bottom:clamp(6px,1.2vh,10px);}
+  body.host-stage .leader-rank{font-size:clamp(15px,1.8vh,20px); width:38px;}
+  body.host-stage .avatar{width:clamp(28px,3.4vh,38px); height:clamp(28px,3.4vh,38px); font-size:clamp(12px,1.6vh,15px);}
+  body.host-stage .leader-score{font-size:clamp(15px,1.8vh,20px);}
+  body.host-stage .rank-change{font-size:clamp(12px,1.4vh,15px);}
+
+  /* ===== Confetti + fireworks background effect (host results/ended) ===== */
+  .fx-layer{position:fixed; inset:0; pointer-events:none; overflow:hidden; z-index:0;}
+  .confetti-piece{position:absolute; top:-24px; width:9px; height:15px; opacity:.95; border-radius:2px; animation-name:confettiFall; animation-timing-function:linear; animation-fill-mode:forwards;}
+  @keyframes confettiFall{
+    0%{transform:translateY(-10vh) rotate(0deg); opacity:1;}
+    100%{transform:translateY(115vh) rotate(600deg); opacity:.4;}
+  }
+  .firework{position:absolute; width:0; height:0;}
+  .firework .spark{position:absolute; width:6px; height:6px; border-radius:50%; left:0; top:0; animation:sparkFly .85s ease-out forwards;}
+  @keyframes sparkFly{
+    0%{transform:rotate(var(--angle)) translateX(0); opacity:1;}
+    100%{transform:rotate(var(--angle)) translateX(90px); opacity:0;}
+  }
+
   /* ===== Respect users who prefer reduced motion ===== */
   @media (prefers-reduced-motion:reduce){
     *{transition:none !important;}
+    .leader-row{animation:none;}
+    .confetti-piece, .firework .spark{animation:none; display:none;}
   }
 </style>
 </head>
 <body>
 <div class="brand"><div class="logo"><img src="logo.jpg" alt="Live!QUIZZ logo" onerror="this.style.display='none'"></div><span class="title" aria-label="Live!QUIZZ"><span class="letter">L</span><span class="letter">i</span><span class="letter">v</span><span class="letter">e</span><span class="letter bang">!</span><span class="letter">Q</span><span class="letter">U</span><span class="letter">I</span><span class="letter">Z</span><span class="letter">Z</span></span></div>
+<div class="fx-layer" id="fx-layer"></div>
 <div id="app"></div>
 
 <script src="/socket.io/socket.io.js"></script>
@@ -181,6 +250,10 @@ function render(){
   else if(state.screen==="player_ended") app.innerHTML = viewEnded();
   bind();
   if(state.screen==="host_lobby") renderQr();
+  const isHostStage = state.screen==="host_question" || state.screen==="host_results" || state.screen==="host_ended";
+  document.body.classList.toggle("host-stage", isHostStage);
+  if(state.screen==="host_results" || state.screen==="host_ended") startCelebration();
+  else clearFx();
 }
 
 function renderQr(){
@@ -189,6 +262,58 @@ function renderQr(){
   box.innerHTML = "";
   const joinUrl = `${location.origin}${location.pathname}?join=${state.code}`;
   new QRCode(box, { text: joinUrl, width: 168, height: 168, colorDark:"#241B4D", colorLight:"#ffffff" });
+}
+
+// ---- Celebration effects (confetti + fireworks) ----
+let fxInterval = null;
+const FX_COLORS = ["#FFC93C","#8B5CF6","#12B886","#FF4757","#1E90FF","#2ED573"];
+function clearFx(){
+  if(fxInterval){ clearInterval(fxInterval); fxInterval = null; }
+  const layer = el("fx-layer");
+  if(layer) layer.innerHTML = "";
+}
+function startCelebration(){
+  clearFx();
+  const layer = el("fx-layer");
+  if(!layer) return;
+  spawnConfettiBurst(layer, 36);
+  spawnFirework(layer);
+  fxInterval = setInterval(()=>{
+    spawnFirework(layer);
+    if(Math.random()<0.4) spawnConfettiBurst(layer, 10);
+  }, 1000);
+}
+function spawnConfettiBurst(layer, count){
+  for(let i=0;i<count;i++){
+    const piece = document.createElement("div");
+    piece.className = "confetti-piece";
+    piece.style.left = Math.random()*100+"%";
+    piece.style.background = FX_COLORS[Math.floor(Math.random()*FX_COLORS.length)];
+    piece.style.animationDuration = (2.4+Math.random()*2.2)+"s";
+    piece.style.animationDelay = (Math.random()*0.8)+"s";
+    piece.style.borderRadius = Math.random()<0.5 ? "50%" : "2px";
+    layer.appendChild(piece);
+    setTimeout(()=>piece.remove(), 5500);
+  }
+}
+function spawnFirework(layer){
+  const x = 8+Math.random()*84;
+  const y = 12+Math.random()*38;
+  const color = FX_COLORS[Math.floor(Math.random()*FX_COLORS.length)];
+  const burst = document.createElement("div");
+  burst.className = "firework";
+  burst.style.left = x+"%";
+  burst.style.top = y+"%";
+  const sparkCount = 14;
+  for(let i=0;i<sparkCount;i++){
+    const spark = document.createElement("span");
+    spark.className = "spark";
+    spark.style.setProperty("--angle", (i/sparkCount*360)+"deg");
+    spark.style.background = color;
+    burst.appendChild(spark);
+  }
+  layer.appendChild(burst);
+  setTimeout(()=>burst.remove(), 900);
 }
 
 function viewLanding(){
@@ -244,7 +369,7 @@ function viewResults(isHost){
   return `<div class="card">
   ${isHost?"":banner}
   <h3 style="margin-top:0" class="center">Bảng xếp hạng</h3>
-  <div id="leaderboard">${renderLeaderboard(state.leaderboard)}</div>
+  <div id="leaderboard">${renderLeaderboard(state.leaderboard, state.prevRankMap)}</div>
   <div class="divider"></div>
   ${isHost
     ? `<button class="primary block" id="next-question">${state.currentIndex+1<state.totalQuestions?"Câu tiếp theo":"Kết thúc trò chơi"}</button>`
@@ -256,7 +381,7 @@ function viewEnded(){
     ? `<a href="/api/games/${state.gameId}/report.csv" style="text-decoration:none"><button class="primary block">Tải báo cáo chi tiết (CSV)</button></a>`
     : "";
   return `<div class="card center"><h2 style="margin-top:0">Kết quả chung cuộc</h2>
-  <div id="leaderboard-final">${renderLeaderboard(state.leaderboard)}</div>
+  <div id="leaderboard-final">${renderLeaderboard(state.leaderboard, state.prevRankMap)}</div>
   <div class="divider"></div>
   ${reportBtn}
   <button class="secondary block" id="back-landing" style="margin-top:10px">Về trang chủ</button></div>`;
@@ -279,9 +404,34 @@ function viewPlayerWait(){
   <div class="avatar lg" style="margin:18px auto 0">${esc(state.selectedIcon)}</div>
   <p class="muted" style="margin-top:14px">Đang chờ host bắt đầu trò chơi…</p></div>`;
 }
-function renderLeaderboard(list){
+function buildRankMap(list){
+  const map = {};
+  (list||[]).forEach((p,i)=>{ map[p.name] = i+1; });
+  return map;
+}
+function rankIcon(rank){
+  return rank===1?"🥇":rank===2?"🥈":rank===3?"🥉":rank;
+}
+function renderLeaderboard(list, prevRankMap){
   if(!list || list.length===0) return `<p class="muted center">Chưa có người chơi nào.</p>`;
-  return list.map((p,i)=>`<div class="leader-row"><div class="leader-rank">${i+1}</div><div class="avatar" style="margin-right:8px">${esc(p.icon||p.name.slice(0,1).toUpperCase())}</div><div class="leader-name">${esc(p.name)}</div><div class="leader-score">${p.score}</div></div>`).join("");
+  return list.map((p,i)=>{
+    const rank = i+1;
+    const topClass = rank<=3 ? ` top${rank}` : "";
+    const prevRank = prevRankMap ? prevRankMap[p.name] : null;
+    let changeHtml = "";
+    if(prevRank!=null){
+      if(prevRank>rank) changeHtml = `<div class="rank-change up">▲</div>`;
+      else if(prevRank<rank) changeHtml = `<div class="rank-change down">▼</div>`;
+      else changeHtml = `<div class="rank-change same">–</div>`;
+    }
+    return `<div class="leader-row${topClass}" style="animation-delay:${(i*0.06).toFixed(2)}s">
+      <div class="leader-rank">${rankIcon(rank)}</div>
+      <div class="avatar" style="margin-right:8px">${esc(p.icon||p.name.slice(0,1).toUpperCase())}</div>
+      <div class="leader-name">${esc(p.name)}</div>
+      ${changeHtml}
+      <div class="leader-score">${p.score}</div>
+    </div>`;
+  }).join("");
 }
 
 function bind(){
@@ -367,12 +517,14 @@ socket.on("answer:count", ({answered,total})=>{
 });
 
 socket.on("game:results", ({leaderboard})=>{
+  state.prevRankMap = buildRankMap(state.leaderboard);
   state.leaderboard = leaderboard;
   state.screen = state.role==="host" ? "host_results" : "player_results";
   render();
 });
 
 socket.on("game:ended", ({leaderboard, gameId})=>{
+  state.prevRankMap = buildRankMap(state.leaderboard);
   state.leaderboard = leaderboard;
   state.gameId = gameId;
   state.screen = state.role==="host" ? "host_ended" : "player_ended";
