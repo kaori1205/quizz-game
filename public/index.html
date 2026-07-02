@@ -23,9 +23,9 @@
   h1,h2,h3{font-family:Arial,sans-serif;}
   #app{width:100%; max-width:480px; display:flex; flex-direction:column; align-items:center; gap:18px; position:relative; z-index:1;}
   .brand{display:flex; align-items:center; gap:2px; margin-bottom:6px;}
-  .brand .logo{width:44px;height:44px;border-radius:12px; background:#fff; box-shadow:0 4px 18px rgba(0,0,0,0.25); display:flex; align-items:center; justify-content:center; overflow:hidden; transform:rotate(-6deg); flex-shrink:0;}
+  .brand .logo{width:56px;height:56px;border-radius:14px; background:#fff; box-shadow:0 4px 18px rgba(0,0,0,0.25); display:flex; align-items:center; justify-content:center; overflow:hidden; transform:rotate(-6deg); flex-shrink:0;}
   .brand .logo img{width:100%; height:100%; object-fit:cover; display:block;}
-  .brand span{font-family:'Luckiest Guy',cursive; font-weight:400; font-size:clamp(24px,7vw,34px); letter-spacing:1px; color:#fff; text-shadow:0 2px 10px rgba(0,0,0,0.2);}
+  .brand span{font-family:'Luckiest Guy',cursive; font-weight:400; font-size:clamp(18px,5vw,26px); letter-spacing:1px; color:#fff; text-shadow:0 2px 10px rgba(0,0,0,0.2);}
   .brand .letter{display:inline-block;}
   .brand .letter.bang{color:var(--gold); animation:bangPulse 1.3s ease-in-out infinite; text-shadow:0 0 10px rgba(255,201,60,.7), 0 2px 10px rgba(0,0,0,0.2); transform-origin:bottom center; will-change:transform;}
   @keyframes bangPulse{
@@ -83,6 +83,8 @@
   .opt:not(:disabled):hover{transform:translateY(-2px);}
   .opt:not(:disabled):active{transform:translateY(4px); box-shadow:none !important;}
   .opt:disabled{opacity:.45; cursor:default; box-shadow:none;}
+  .opt-logo{width:28px; height:28px; border-radius:9px; background:#fff; display:flex; align-items:center; justify-content:center; flex-shrink:0; box-shadow:0 2px 6px rgba(0,0,0,.18);}
+  .opt-logo span{font-family:'Luckiest Guy',cursive; font-weight:400; font-size:16px; line-height:1; display:block;}
   .leader-row{display:flex; align-items:center; justify-content:space-between; background:var(--panel-2); border:1px solid var(--line); border-radius:12px; padding:12px 16px; margin-bottom:8px; animation:rowIn .5s ease both;}
   .leader-row.top1{background:linear-gradient(90deg,rgba(255,201,60,.28),rgba(255,201,60,.06)); border-color:rgba(255,201,60,.55); box-shadow:0 6px 16px rgba(255,201,60,.22);}
   .leader-row.top2{background:linear-gradient(90deg,rgba(148,163,184,.28),rgba(148,163,184,.06)); border-color:rgba(148,163,184,.5);}
@@ -100,6 +102,23 @@
   .result-banner{text-align:center; padding:18px; border-radius:14px; margin-bottom:16px; font-family:Arial,sans-serif; font-weight:700; font-size:20px;}
   .result-banner.ok{background:rgba(34,197,94,.14); color:#16A34A; border:1px solid rgba(34,197,94,.35);}
   .result-banner.no{background:rgba(255,71,87,.12); color:#DC2626; border:1px solid rgba(255,71,87,.35);}
+
+  /* ===== Q&A card: question box = 1/3 height (dark blur box), answers = 3/5 height (fills area, each opt = 1/4), footer sized to content pinned at bottom ===== */
+  .card.qa-card{display:flex; flex-direction:column; min-height:clamp(420px,70vh,640px);}
+  .qa-question{flex:3 1 0%; display:flex; align-items:center; justify-content:center;}
+  .question-box{width:100%; background:rgba(58,45,120,.20); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); border:1px solid rgba(255,255,255,.14); border-radius:18px; padding:22px 24px; box-shadow:0 10px 28px rgba(20,10,50,.14);}
+  .question-box .question-text{width:100%; margin:0; color:#1A1333; text-align:center;}
+  .qa-answers{flex:2 1 0%; display:flex; align-items:stretch;}
+  .qa-answers .opts{width:100%; height:100%; grid-template-rows:1fr 1fr;}
+  .qa-answers .opts .opt{height:100%; min-height:0;}
+  .qa-footer{flex:0 0 auto; display:flex; flex-direction:column; justify-content:flex-end;}
+
+  /* ===== Leaderboard card: footer (divider + action) pinned to bottom ===== */
+  .card.lb-card{display:flex; flex-direction:column; min-height:clamp(420px,70vh,640px);}
+  .lb-title{margin-top:0; text-transform:uppercase; font-size:clamp(20px,4.6vw,30px); letter-spacing:1px;}
+  .lb-list{flex:1; overflow:auto; background:rgba(58,45,120,.34); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); border:1px solid rgba(255,255,255,.14); border-radius:16px; padding:12px; box-shadow:0 10px 28px rgba(20,10,50,.16);}
+  .lb-list .muted{color:rgba(255,255,255,.72);}
+  .lb-footer{margin-top:auto;}
 
   /* ===== Responsive: tablets & small laptops ===== */
   @media (min-width:768px){
@@ -154,8 +173,8 @@
     box-shadow:0 6px 16px rgba(0,0,0,.28);
     backdrop-filter:blur(2px);
   }
-  body.host-stage .brand .logo{width:24px; height:24px; border-radius:8px;}
-  body.host-stage .brand span.title{font-size:15px; letter-spacing:0.5px;}
+  body.host-stage .brand .logo{width:32px; height:32px; border-radius:9px;}
+  body.host-stage .brand span.title{font-size:12px; letter-spacing:0.5px;}
   body.host-stage #app{
     position:fixed;
     top:max(100px, env(safe-area-inset-top));
@@ -174,7 +193,9 @@
   body.host-stage .question-text{font-size:clamp(20px,3.4vh,34px); margin:clamp(8px,1.6vh,16px) 0 clamp(14px,2.4vh,24px); line-height:1.25;}
   body.host-stage .opts{gap:clamp(10px,1.6vh,18px);}
   body.host-stage .opt{min-height:clamp(52px,8vh,84px); font-size:clamp(15px,2vh,20px); padding:clamp(12px,1.8vh,20px) 18px; border-radius:16px; gap:12px;}
-  body.host-stage .opt svg{width:clamp(16px,2vh,22px); height:clamp(16px,2vh,22px);}
+  body.host-stage .opt-logo{width:clamp(24px,3.4vh,34px); height:clamp(24px,3.4vh,34px);}
+  body.host-stage .opt-logo span{font-size:clamp(14px,1.8vh,19px);}
+  body.host-stage .opt:disabled{opacity:1;}
   body.host-stage .divider{margin:clamp(10px,1.6vh,18px) 0;}
   body.host-stage #answered-count{font-size:clamp(13px,1.6vh,16px); margin:clamp(8px,1.4vh,14px) 0;}
   body.host-stage #force-end, body.host-stage #next-question{font-size:clamp(14px,1.8vh,18px); padding:clamp(12px,1.8vh,16px) 24px;}
@@ -217,10 +238,10 @@
 const socket = io();
 const OPT_CLASSES = ["red","blue","yellow","green"];
 const SHAPES = {
-  red:`<svg width="20" height="20" viewBox="0 0 20 20"><polygon points="10,2 18,18 2,18" fill="#fff"/></svg>`,
-  blue:`<svg width="20" height="20" viewBox="0 0 20 20"><polygon points="10,1 19,10 10,19 1,10" fill="#fff"/></svg>`,
-  yellow:`<svg width="20" height="20" viewBox="0 0 20 20"><circle cx="10" cy="10" r="8" fill="#fff"/></svg>`,
-  green:`<svg width="20" height="20" viewBox="0 0 20 20"><rect x="2" y="2" width="16" height="16" rx="3" fill="#fff"/></svg>`,
+  red:`<span class="opt-logo"><span style="color:var(--a-red)">V</span></span>`,
+  blue:`<span class="opt-logo"><span style="color:var(--a-blue)">V</span></span>`,
+  yellow:`<span class="opt-logo"><span style="color:var(--a-yellow)">V</span></span>`,
+  green:`<span class="opt-logo"><span style="color:var(--a-green)">V</span></span>`,
 };
 const ICON_OPTS = ["A","B","C","D","E","F","G","H","I","J","K","L"];
 
@@ -345,7 +366,7 @@ function viewHostLobby(){
   </div>`;
 }
 function viewQuestion(isHost){
-  return `<div class="card">
+  return `<div class="card qa-card">
   <div class="qmeta">
     <div class="badge">Câu ${state.currentIndex+1}/${state.totalQuestions}</div>
     <div class="timer-ring"><svg width="64" height="64" viewBox="0 0 64 64">
@@ -353,27 +374,31 @@ function viewQuestion(isHost){
       <circle id="ring" cx="32" cy="32" r="28" stroke="var(--gold)" stroke-dasharray="176" stroke-dashoffset="0" stroke-linecap="round"></circle>
     </svg><div class="timer-num" id="timer-num">--</div></div>
   </div>
-  <div class="question-text">${esc(state.question)}</div>
-  <div class="opts">
+  <div class="qa-question"><div class="question-box"><div class="question-text">${esc(state.question)}</div></div></div>
+  <div class="qa-answers"><div class="opts">
     ${state.options.map((o,i)=>`<button class="opt ${OPT_CLASSES[i]}" data-choice="${i}" ${isHost||state.answered?"disabled":""} style="${isHost?"cursor:default":""}">${SHAPES[OPT_CLASSES[i]]}<span>${esc(o)}</span></button>`).join("")}
-  </div>
+  </div></div>
+  <div class="qa-footer">
   ${isHost
     ? `<div class="divider"></div><p class="muted center" id="answered-count">0 người đã trả lời</p><button class="primary block" id="force-end">Kết thúc câu hỏi ngay</button>`
-    : `<p class="muted center" style="margin-top:14px">${state.answered?"Đã gửi đáp án — chờ kết quả…":"Chọn một đáp án"}</p>`}
+    : `<div class="divider"></div><p class="muted center">${state.answered?"Đã gửi đáp án — chờ kết quả…":"Chọn một đáp án"}</p>`}
+  </div>
   </div>`;
 }
 function viewResults(isHost){
   const banner = state.lastCorrect===null ? "" :
     state.lastCorrect ? `<div class="result-banner ok">Chính xác! +${state.lastPoints} điểm</div>`
                        : `<div class="result-banner no">Sai rồi! +0 điểm</div>`;
-  return `<div class="card">
+  return `<div class="card lb-card">
   ${isHost?"":banner}
-  <h3 style="margin-top:0" class="center">Bảng xếp hạng</h3>
-  <div id="leaderboard">${renderLeaderboard(state.leaderboard, state.prevRankMap)}</div>
+  <h3 class="center lb-title">Bảng xếp hạng</h3>
+  <div class="lb-list" id="leaderboard">${renderLeaderboard(state.leaderboard, state.prevRankMap)}</div>
+  <div class="lb-footer">
   <div class="divider"></div>
   ${isHost
     ? `<button class="primary block" id="next-question">${state.currentIndex+1<state.totalQuestions?"Câu tiếp theo":"Kết thúc trò chơi"}</button>`
     : `<p class="muted center">Đang chờ host chuyển câu tiếp theo…</p>`}
+  </div>
   </div>`;
 }
 function viewEnded(){
