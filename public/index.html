@@ -16,16 +16,26 @@
     --radius:20px;
   }
   *{box-sizing:border-box;}
-  body{margin:0; position:relative; overflow-x:hidden; background:linear-gradient(135deg,#6D28D9 0%,#8B5CF6 45%,#A855F7 100%); color:var(--text); font-family:Arial,sans-serif; min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:40px 16px;}
+  html{-webkit-text-size-adjust:100%; text-size-adjust:100%;}
+  body{margin:0; position:relative; overflow-x:hidden; background:linear-gradient(135deg,#6D28D9 0%,#8B5CF6 45%,#A855F7 100%); color:var(--text); font-family:Arial,sans-serif; min-height:100vh; min-height:100dvh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:40px 16px; padding-top:max(40px, env(safe-area-inset-top)); padding-bottom:max(40px, env(safe-area-inset-bottom)); padding-left:max(16px, env(safe-area-inset-left)); padding-right:max(16px, env(safe-area-inset-right));}
   body::before{content:"";position:fixed; top:-220px; right:-160px; width:500px; height:500px; border-radius:50%; background:radial-gradient(circle at 30% 30%, rgba(255,255,255,0.16), transparent 70%); pointer-events:none;}
   body::after{content:"";position:fixed; bottom:-260px; left:-200px; width:600px; height:600px; border-radius:50%; background:radial-gradient(circle at 70% 70%, rgba(255,255,255,0.12), transparent 70%); pointer-events:none;}
   h1,h2,h3{font-family:Arial,sans-serif;}
   #app{width:100%; max-width:480px; display:flex; flex-direction:column; align-items:center; gap:18px; position:relative; z-index:1;}
   .brand{display:flex; align-items:center; gap:2px; margin-bottom:6px;}
-  .brand .logo{width:44px;height:44px;border-radius:12px; background:#fff; box-shadow:0 4px 18px rgba(0,0,0,0.25); display:flex; align-items:center; justify-content:center; overflow:hidden; transform:rotate(-6deg);}
-  .brand .logo::after{content:"V"; font-family:'Luckiest Guy',cursive; font-weight:400; font-size:32px; line-height:1; color:#0B2E6B; display:inline-block; transform:scaleY(1.5);}
-  .brand span{font-family:'Luckiest Guy',cursive; font-weight:400; font-size:34px; letter-spacing:1px; color:#fff; text-shadow:0 2px 10px rgba(0,0,0,0.2);}
-  .card{width:100%; background:var(--panel); border:none; border-radius:var(--radius); padding:32px 28px; box-shadow:0 24px 48px -12px rgba(30,10,70,0.35);}
+  .brand .logo{width:44px;height:44px;border-radius:12px; background:#fff; box-shadow:0 4px 18px rgba(0,0,0,0.25); display:flex; align-items:center; justify-content:center; overflow:hidden; transform:rotate(-6deg); flex-shrink:0;}
+  .brand .logo img{width:100%; height:100%; object-fit:cover; display:block;}
+  .brand span{font-family:'Luckiest Guy',cursive; font-weight:400; font-size:clamp(24px,7vw,34px); letter-spacing:1px; color:#fff; text-shadow:0 2px 10px rgba(0,0,0,0.2);}
+  .brand .letter{display:inline-block;}
+  .brand .letter.bang{color:var(--gold); animation:bangPulse 1.3s ease-in-out infinite; text-shadow:0 0 10px rgba(255,201,60,.7), 0 2px 10px rgba(0,0,0,0.2); transform-origin:bottom center; will-change:transform;}
+  @keyframes bangPulse{
+    0%,60%,100%{transform:translateY(0) scale(1) rotate(0deg);}
+    30%{transform:translateY(-9px) scale(1.25) rotate(8deg);}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .brand .letter.bang{animation:none;}
+  }
+  .card{width:100%; background:var(--panel); border:none; border-radius:var(--radius); padding:clamp(20px,6vw,32px) clamp(16px,5vw,28px); box-shadow:0 24px 48px -12px rgba(30,10,70,0.35);}
   .center{text-align:center;}
   .row{display:flex; gap:12px; flex-wrap:wrap;}
   button{font-family:Arial,sans-serif; font-weight:700; font-size:16px; border:none; border-radius:14px; cursor:pointer; padding:14px 20px; color:#241B4D; background:var(--gold); box-shadow:0 6px 0 0 #E0A800; transition:transform .12s,box-shadow .12s,opacity .12s;}
@@ -47,7 +57,7 @@
   .role-btn.host:active{box-shadow:0 3px 0 0 #5321A8;}
   .role-btn.player{background:linear-gradient(135deg,#FFD966,var(--gold)); color:#241B4D; box-shadow:0 8px 0 0 #E0A800;}
   .role-btn.player:active{box-shadow:0 3px 0 0 #E0A800;}
-  .code-plaque{font-family:Arial,sans-serif; font-weight:700; font-size:44px; letter-spacing:8px; background:rgba(0,0,0,.3); border:1px dashed var(--primary-2); border-radius:14px; padding:14px 10px; color:var(--gold);}
+  .code-plaque{font-family:Arial,sans-serif; font-weight:700; font-size:clamp(28px,9vw,44px); letter-spacing:clamp(3px,1.5vw,8px); background:rgba(0,0,0,.3); border:1px dashed var(--primary-2); border-radius:14px; padding:14px 10px; color:var(--gold); word-break:break-all;}
   .badge{display:inline-flex; align-items:center; gap:6px; background:rgba(45,212,191,.14); color:var(--teal); border:1px solid rgba(45,212,191,.35); font-weight:600; font-size:13px; padding:5px 11px; border-radius:999px;}
   .badge.dim{background:rgba(169,164,217,.12); color:var(--text-dim); border-color:var(--line);}
   .player-chip{background:var(--panel-2); border:1px solid var(--line); border-radius:10px; padding:6px 12px 6px 6px; font-size:14px; font-weight:600; display:flex; align-items:center; gap:8px;}
@@ -66,7 +76,7 @@
   .timer-ring svg{transform:rotate(-90deg);}
   .timer-ring circle{fill:none; stroke-width:6;}
   .timer-num{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-family:Arial,sans-serif; font-weight:700; font-size:20px;}
-  .question-text{font-family:Arial,sans-serif; font-size:24px; font-weight:600; line-height:1.35; margin:6px 0 18px;}
+  .question-text{font-family:Arial,sans-serif; font-size:clamp(18px,5vw,24px); font-weight:600; line-height:1.35; margin:6px 0 18px; word-break:break-word;}
   .opts{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
   .opt{display:flex; align-items:center; gap:10px; border-radius:14px; padding:18px 16px; font-family:Arial,sans-serif; font-weight:700; font-size:16px; color:#fff; cursor:pointer; border:none; text-align:left; min-height:64px; transition:transform .12s,box-shadow .12s,opacity .12s;}
   .opt.red{background:var(--a-red); box-shadow:0 6px 0 0 #C23140;} .opt.blue{background:var(--a-blue); box-shadow:0 6px 0 0 #1560B0;} .opt.yellow{background:var(--a-yellow); box-shadow:0 6px 0 0 #C98600;} .opt.green{background:var(--a-green); box-shadow:0 6px 0 0 #1F9E5A;}
@@ -82,10 +92,55 @@
   .result-banner{text-align:center; padding:18px; border-radius:14px; margin-bottom:16px; font-family:Arial,sans-serif; font-weight:700; font-size:20px;}
   .result-banner.ok{background:rgba(34,197,94,.14); color:#16A34A; border:1px solid rgba(34,197,94,.35);}
   .result-banner.no{background:rgba(255,71,87,.12); color:#DC2626; border:1px solid rgba(255,71,87,.35);}
+
+  /* ===== Responsive: tablets & small laptops ===== */
+  @media (min-width:768px){
+    #app{max-width:520px;}
+  }
+
+  /* ===== Responsive: large screens (center content, avoid stretching) ===== */
+  @media (min-width:1024px){
+    #app{max-width:540px;}
+    .question-text{font-size:clamp(22px,2.4vw,28px);}
+  }
+
+  /* ===== Responsive: small phones ===== */
+  @media (max-width:380px){
+    body{padding:24px 12px;}
+    .card{padding:18px 14px;}
+    .role-pick{grid-template-columns:1fr; gap:12px;}
+    .role-btn{padding:22px 14px; font-size:17px;}
+    .opts{grid-template-columns:1fr; gap:10px;}
+    .opt{padding:14px 12px; min-height:52px; font-size:15px;}
+    .icon-picker{grid-template-columns:repeat(4,1fr);}
+    .avatar.lg{width:44px; height:44px; font-size:16px;}
+    .timer-ring{width:52px; height:52px;}
+    .timer-ring svg{width:52px; height:52px;}
+    .code-plaque{letter-spacing:3px;}
+  }
+
+  /* ===== Responsive: very short viewports (landscape phones) ===== */
+  @media (max-height:480px) and (orientation:landscape){
+    body{padding:16px 16px; justify-content:flex-start;}
+    #app{max-width:640px;}
+    .card{padding:16px 20px;}
+    .opts{grid-template-columns:1fr 1fr;}
+  }
+
+  /* ===== Reduce decorative blobs on small screens to avoid clipping issues ===== */
+  @media (max-width:480px){
+    body::before{width:320px; height:320px; top:-140px; right:-120px;}
+    body::after{width:380px; height:380px; bottom:-160px; left:-140px;}
+  }
+
+  /* ===== Respect users who prefer reduced motion ===== */
+  @media (prefers-reduced-motion:reduce){
+    *{transition:none !important;}
+  }
 </style>
 </head>
 <body>
-<div class="brand"><div class="logo"></div><span>Live!QUIZZ</span></div>
+<div class="brand"><div class="logo"><img src="logo.jpg" alt="Live!QUIZZ logo" onerror="this.style.display='none'"></div><span class="title" aria-label="Live!QUIZZ"><span class="letter">L</span><span class="letter">i</span><span class="letter">v</span><span class="letter">e</span><span class="letter bang">!</span><span class="letter">Q</span><span class="letter">U</span><span class="letter">I</span><span class="letter">Z</span><span class="letter">Z</span></span></div>
 <div id="app"></div>
 
 <script src="/socket.io/socket.io.js"></script>
