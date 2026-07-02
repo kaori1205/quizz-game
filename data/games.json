@@ -1,1 +1,20 @@
-[]
+[
+  {
+    "id": "mr3gavqm-waedox",
+    "roomCode": "3035",
+    "startedAt": 1782993500984,
+    "endedAt": 1782993513257,
+    "numQuestions": 5,
+    "players": [],
+    "answers": []
+  },
+  {
+    "id": "mr3gency-mje81d",
+    "roomCode": "7580",
+    "startedAt": 1782993683450,
+    "endedAt": 1782993689024,
+    "numQuestions": 5,
+    "players": [],
+    "answers": []
+  }
+]
