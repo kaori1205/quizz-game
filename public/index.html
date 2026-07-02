@@ -22,7 +22,7 @@
   body::after{content:"";position:fixed; bottom:-260px; left:-200px; width:600px; height:600px; border-radius:50%; background:radial-gradient(circle at 70% 70%, rgba(255,255,255,0.12), transparent 70%); pointer-events:none;}
   h1,h2,h3{font-family:Arial,sans-serif;}
   #app{width:100%; max-width:480px; display:flex; flex-direction:column; align-items:center; gap:18px; position:relative; z-index:1;}
-  .brand{display:flex; align-items:center; gap:2px; margin-bottom:30px;}
+  .brand{display:flex; align-items:center; gap:2px; margin-bottom:30px; cursor:pointer;}
   .brand .logo{width:44px;height:44px;border-radius:12px; background:#fff; box-shadow:0 4px 18px rgba(0,0,0,0.25); display:flex; align-items:center; justify-content:center; overflow:hidden; transform:rotate(-6deg); flex-shrink:0;}
   .brand .logo img{width:100%; height:100%; object-fit:cover; display:block;}
   .brand span{font-family:'Luckiest Guy',cursive; font-weight:400; font-size:clamp(24px,7vw,34px); letter-spacing:1px; color:#fff; text-shadow:0 2px 10px rgba(0,0,0,0.2);}
@@ -275,7 +275,7 @@
 </style>
 </head>
 <body>
-<div class="brand"><div class="logo"><img src="logo.jpg" alt="Live!QUIZZ logo" onerror="this.style.display='none'"></div><span class="title" aria-label="Live!QUIZZ"><span class="letter">L</span><span class="letter">i</span><span class="letter">v</span><span class="letter">e</span><span class="letter bang">!</span><span class="letter">Q</span><span class="letter">U</span><span class="letter">I</span><span class="letter">Z</span><span class="letter">Z</span></span></div>
+<div class="brand" id="brand-home" role="button" tabindex="0" aria-label="Về trang chủ"><div class="logo"><img src="logo.jpg" alt="Live!QUIZZ logo" onerror="this.style.display='none'"></div><span class="title" aria-label="Live!QUIZZ"><span class="letter">L</span><span class="letter">i</span><span class="letter">v</span><span class="letter">e</span><span class="letter bang">!</span><span class="letter">Q</span><span class="letter">U</span><span class="letter">I</span><span class="letter">Z</span><span class="letter">Z</span></span></div>
 <div class="fx-layer" id="fx-layer"></div>
 <div id="app"></div>
 
@@ -436,7 +436,9 @@ function viewHostSetup(){
     <label style="display:block; font-weight:700; font-size:13px; margin-bottom:6px; color:var(--text-dim);">Chọn bộ câu hỏi</label>
     <select id="question-set-select" style="width:100%; border:1px solid var(--line); border-radius:10px; padding:10px 12px; font-size:15px; font-family:Arial,sans-serif; color:var(--text); background:#fff;">${options}</select>
   </div>
-  <button class="primary block" id="create-room">Tạo phòng ngay</button></div>`;
+  <button class="primary block" id="create-room">Tạo phòng ngay</button>
+  <button class="secondary block" id="back-landing" style="margin-top:10px">Về trang chủ</button>
+  </div>`;
 }
 function viewHostLobby(){
   return `<div class="card center lobby-card">
@@ -558,6 +560,11 @@ function bind(){
   b("pick-history", ()=>{ location.href="/history.html"; });
   b("pick-admin", ()=>{ location.href="/admin.html"; });
   b("back-landing", ()=>{ location.href = location.pathname; });
+  const brandEl = el("brand-home");
+  if(brandEl){
+    brandEl.onclick = ()=>{ location.href = location.pathname; };
+    brandEl.onkeydown = (e)=>{ if(e.key==="Enter" || e.key===" "){ e.preventDefault(); location.href = location.pathname; } };
+  }
   document.querySelectorAll(".icon-opt").forEach(node=>{
     node.onclick=()=>{
       state.selectedIcon = node.dataset.icon;
