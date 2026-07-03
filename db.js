@@ -1,98 +1,78 @@
-const fs = require("fs");
-const path = require("path");
+const { MongoClient } = require("mongodb");
 
-const DATA_DIR = path.join(__dirname, "data");
-const DATA_FILE = path.join(DATA_DIR, "games.json");
-
-function ensureFile() {
-  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-  if (!fs.existsSync(DATA_FILE)) fs.writeFileSync(DATA_FILE, "[]", "utf8");
+const uri = process.env.MONGODB_URI;
+if (!uri) {
+  throw new Error("Thiếu biến môi trường MONGODB_URI — xem README phần cấu hình MongoDB.");
 }
 
-function loadAll() {
-  ensureFile();
-  try {
-    const raw = fs.readFileSync(DATA_FILE, "utf8");
-    return JSON.parse(raw || "[]");
-  } catch (e) {
-    console.error("Lỗi đọc file dữ liệu, khởi tạo lại:", e.message);
-    return [];
+const client = new MongoClient(uri);
+let gamesCol = null;
+let qsetsCol = null;
+let connecting = null;
+
+function connect() {
+  if (gamesCol) return Promise.resolve();
+  if (!connecting) {
+    connecting = client.connect().then(() => {
+      const database = client.db(process.env.MONGODB_DB || "quizgame");
+      gamesCol = database.collection("games");
+      qsetsCol = database.collection("questionSets");
+    });
   }
-}
-
-function writeAll(games) {
-  ensureFile();
-  fs.writeFileSync(DATA_FILE, JSON.stringify(games, null, 2), "utf8");
+  return connecting;
 }
 
 function genId() {
   return Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8);
 }
 
+// Bỏ _id (Mongo) và trả lại dạng {id, ...} như API cũ vẫn trả về
+function withId(doc) {
+  if (!doc) return null;
+  const { _id, ...rest } = doc;
+  return { id: _id, ...rest };
+}
+
 // Lưu một trận đấu đã kết thúc, trả về id của bản ghi
-function saveGame(record) {
-  const games = loadAll();
+async function saveGame(record) {
+  await connect();
   const id = genId();
-  const full = { id, ...record };
-  games.push(full);
-  writeAll(games);
+  await gamesCol.insertOne({ _id: id, ...record });
   return id;
 }
 
-// Danh sách tóm tắt các trận (mới nhất trước)
-function listGames() {
-  const games = loadAll();
-  return games
-    .map((g) => ({
-      id: g.id,
-      roomCode: g.roomCode,
-      endedAt: g.endedAt,
-      numQuestions: g.numQuestions,
-      numPlayers: g.players.length,
-      topPlayer: g.players.slice().sort((a, b) => b.score - a.score)[0] || null,
-    }))
-    .sort((a, b) => b.endedAt - a.endedAt);
+// Danh sách tóm tắt các trận (mới nhất trước).
+// Chỉ lấy các field cần cho danh sách, bỏ qua "answers" (chiếm phần lớn dung lượng mỗi trận).
+async function listGames() {
+  await connect();
+  const games = await gamesCol
+    .find({}, { projection: { roomCode: 1, endedAt: 1, numQuestions: 1, players: 1 } })
+    .sort({ endedAt: -1 })
+    .toArray();
+  return games.map((g) => ({
+    id: g._id,
+    roomCode: g.roomCode,
+    endedAt: g.endedAt,
+    numQuestions: g.numQuestions,
+    numPlayers: g.players.length,
+    topPlayer: g.players.slice().sort((a, b) => b.score - a.score)[0] || null,
+  }));
 }
 
-function getGame(id) {
-  const games = loadAll();
-  return games.find((g) => g.id === id) || null;
+async function getGame(id) {
+  await connect();
+  const g = await gamesCol.findOne({ _id: id });
+  return withId(g);
 }
 
 // Xoá một trận đấu khỏi lịch sử, trả về true nếu xoá thành công
-function deleteGame(id) {
-  const games = loadAll();
-  const next = games.filter((g) => g.id !== id);
-  const changed = next.length !== games.length;
-  if (changed) writeAll(next);
-  return changed;
+async function deleteGame(id) {
+  await connect();
+  const res = await gamesCol.deleteOne({ _id: id });
+  return res.deletedCount > 0;
 }
 
 // ================== BỘ CÂU HỎI (tái sử dụng khi tạo phòng) ==================
-// Lưu ở file riêng data/question-sets.json — hoàn toàn tách biệt với games.json,
-// không ảnh hưởng gì tới lịch sử trận đấu hiện có.
-const QSETS_FILE = path.join(DATA_DIR, "question-sets.json");
-
-function ensureQSetsFile() {
-  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-  if (!fs.existsSync(QSETS_FILE)) fs.writeFileSync(QSETS_FILE, "[]", "utf8");
-}
-
-function loadQSets() {
-  ensureQSetsFile();
-  try {
-    const raw = fs.readFileSync(QSETS_FILE, "utf8");
-    return JSON.parse(raw || "[]");
-  } catch (e) {
-    console.error("Lỗi đọc file bộ câu hỏi, khởi tạo lại:", e.message);
-    return [];
-  }
-}
-
-function writeQSets(sets) {
-  ensureQSetsFile();
-  fs.writeFileSync(QSETS_FILE, JSON.stringify(sets, null, 2), "utf8");
-}
 
 // Chuẩn hoá + loại bỏ câu hỏi không hợp lệ (thiếu câu hỏi hoặc thiếu đủ 4 đáp án)
 function sanitizeQuestions(list) {
@@ -110,61 +90,62 @@ function sanitizeQuestions(list) {
 }
 
 // Danh sách tóm tắt các bộ câu hỏi (mới cập nhật trước)
-function listQuestionSets() {
-  return loadQSets()
-    .map((s) => ({
-      id: s.id,
-      name: s.name,
-      duration: s.duration,
-      numQuestions: (s.questions || []).length,
-      updatedAt: s.updatedAt,
-    }))
-    .sort((a, b) => b.updatedAt - a.updatedAt);
+async function listQuestionSets() {
+  await connect();
+  const sets = await qsetsCol
+    .find({}, { projection: { name: 1, duration: 1, questions: 1, updatedAt: 1 } })
+    .sort({ updatedAt: -1 })
+    .toArray();
+  return sets.map((s) => ({
+    id: s._id,
+    name: s.name,
+    duration: s.duration,
+    numQuestions: (s.questions || []).length,
+    updatedAt: s.updatedAt,
+  }));
 }
 
-function getQuestionSet(id) {
-  return loadQSets().find((s) => s.id === id) || null;
+async function getQuestionSet(id) {
+  await connect();
+  const s = await qsetsCol.findOne({ _id: id });
+  return withId(s);
 }
 
-function createQuestionSet(data) {
-  const sets = loadQSets();
+async function createQuestionSet(data) {
+  await connect();
   const questions = sanitizeQuestions(data.questions);
   if (questions.length === 0) return null;
-  const full = {
-    id: genId(),
+  const doc = {
+    _id: genId(),
     name: String(data.name || "Bộ câu hỏi").trim().slice(0, 80) || "Bộ câu hỏi",
     duration: Number(data.duration) > 0 ? Number(data.duration) : 20,
     questions,
     updatedAt: Date.now(),
   };
-  sets.push(full);
-  writeQSets(sets);
-  return full;
+  await qsetsCol.insertOne(doc);
+  return withId(doc);
 }
 
-function updateQuestionSet(id, data) {
-  const sets = loadQSets();
-  const idx = sets.findIndex((s) => s.id === id);
-  if (idx === -1) return null;
+async function updateQuestionSet(id, data) {
+  await connect();
+  const existing = await qsetsCol.findOne({ _id: id });
+  if (!existing) return null;
   const questions = sanitizeQuestions(data.questions);
   if (questions.length === 0) return null;
-  sets[idx] = {
-    ...sets[idx],
-    name: String(data.name || sets[idx].name).trim().slice(0, 80) || sets[idx].name,
-    duration: Number(data.duration) > 0 ? Number(data.duration) : sets[idx].duration,
+  const changes = {
+    name: String(data.name || existing.name).trim().slice(0, 80) || existing.name,
+    duration: Number(data.duration) > 0 ? Number(data.duration) : existing.duration,
     questions,
     updatedAt: Date.now(),
   };
-  writeQSets(sets);
-  return sets[idx];
+  await qsetsCol.updateOne({ _id: id }, { $set: changes });
+  return withId({ ...existing, ...changes });
 }
 
-function deleteQuestionSet(id) {
-  const sets = loadQSets();
-  const next = sets.filter((s) => s.id !== id);
-  const changed = next.length !== sets.length;
-  if (changed) writeQSets(next);
-  return changed;
+async function deleteQuestionSet(id) {
+  await connect();
+  const res = await qsetsCol.deleteOne({ _id: id });
+  return res.deletedCount > 0;
 }
 
 module.exports = {

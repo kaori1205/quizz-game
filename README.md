@@ -66,8 +66,9 @@ git push -u origin main
    - **Build Command**: `npm install`
    - **Start Command**: `npm start`
    - **Instance Type**: chọn **Free**
-5. Bấm **Create Web Service** → Render tự build và deploy, mất khoảng 1-2 phút.
-6. Sau khi deploy xong, Render cho bạn 1 link dạng `https://quiz-game-live.onrender.com` — gửi link này cho người chơi là xong.
+5. Trong mục **Environment Variables**, thêm biến `MONGODB_URI` với connection string MongoDB Atlas (xem hướng dẫn lấy connection string ở mục "Lưu lịch sử trận đấu" bên dưới).
+6. Bấm **Create Web Service** → Render tự build và deploy, mất khoảng 1-2 phút.
+7. Sau khi deploy xong, Render cho bạn 1 link dạng `https://quiz-game-live.onrender.com` — gửi link này cho người chơi là xong.
 
 **Lưu ý về gói Free của Render:** server sẽ "ngủ" sau ~15 phút không có ai truy cập, và mất khoảng 30-50 giây để "thức dậy" ở lượt truy cập đầu tiên sau đó. Nếu bạn tổ chức sự kiện, nên mở link trước vài phút để server sẵn sàng. Nếu cần server luôn hoạt động không delay, cần nâng cấp gói trả phí.
 
@@ -95,7 +96,8 @@ Render tự động phát hiện push mới và deploy lại (bật sẵn "Auto-
 quiz-game/
 ├── package.json       ← khai báo thư viện cần dùng
 ├── server.js           ← toàn bộ logic server (phòng, câu hỏi, chấm điểm, realtime, lưu lịch sử)
-├── db.js                ← đọc/ghi lịch sử trận đấu vào data/games.json
+├── db.js                ← đọc/ghi lịch sử trận đấu & bộ câu hỏi vào MongoDB
+├── .env.example         ← mẫu file cấu hình MONGODB_URI (copy thành .env, không commit .env)
 ├── public/
 │   ├── index.html         ← giao diện + logic client (host & player dùng chung 1 file)
 │   └── history.html        ← trang xem lịch sử trận đấu & tải báo cáo
@@ -104,7 +106,7 @@ quiz-game/
 
 ## Lưu lịch sử trận đấu & xuất báo cáo
 
-Sau mỗi trận đấu, hệ thống tự động lưu lại vào file `data/games.json` (tự tạo khi chạy lần đầu, không cần cài database gì thêm). Dữ liệu lưu gồm:
+Sau mỗi trận đấu, hệ thống tự động lưu lại vào MongoDB (xem mục cấu hình `MONGODB_URI` bên dưới). Dữ liệu lưu gồm:
 - Tên & điểm tổng của từng người chơi
 - Chi tiết từng câu: ai chọn đáp án nào, đúng/sai, được bao nhiêu điểm, trả lời mất bao nhiêu giây
 
@@ -112,11 +114,20 @@ Sau mỗi trận đấu, hệ thống tự động lưu lại vào file `data/ga
 
 **Tải báo cáo**: ở mỗi trận trong trang lịch sử (hoặc ngay màn hình kết quả chung cuộc của host) có nút **"📥 Tải CSV"** — file CSV mở được trực tiếp bằng Excel/Google Sheets, gồm 2 phần: bảng xếp hạng và chi tiết từng câu trả lời của từng người.
 
-### ⚠️ Lưu ý quan trọng về nơi lưu trữ
+### Nơi lưu trữ: MongoDB Atlas (miễn phí, không mất dữ liệu khi deploy lại)
 
-File `data/games.json` nằm ngay trên ổ đĩa của server. Trên **Render gói Free**, ổ đĩa này **không đảm bảo tồn tại vĩnh viễn** — dữ liệu có thể mất khi bạn deploy lại code mới (push commit mới) hoặc khi Render di chuyển service sang máy chủ khác. Với nhu cầu vừa phải (vài chục trận, thỉnh thoảng deploy lại), cách này vẫn ổn để dùng thử. Nếu bạn cần lưu trữ chắc chắn lâu dài (dữ liệu quan trọng, không được mất), có 2 hướng nâng cấp:
-- Dùng **Render Persistent Disk** (tính năng trả phí, gắn ổ đĩa cố định vào service)
-- Chuyển sang dùng database ngoài như **Render PostgreSQL** (có gói free) hoặc **Supabase** — mình có thể hướng dẫn/code thêm phần này nếu bạn cần.
+Dữ liệu (lịch sử trận đấu + bộ câu hỏi) được lưu ở **MongoDB Atlas** thay vì file trên ổ đĩa server, vì trên **Render gói Free** ổ đĩa không đảm bảo tồn tại vĩnh viễn (mất khi deploy lại hoặc Render di chuyển service). Cần cấu hình 1 lần:
+
+1. Vào https://www.mongodb.com/cloud/atlas/register, tạo tài khoản miễn phí.
+2. Tạo cluster **M0 Free**, tạo 1 Database User (username/password), và ở mục Network Access thêm `0.0.0.0/0` (cho phép Render kết nối tới).
+3. Bấm **Connect** → **Drivers** → copy connection string dạng:
+   ```
+   mongodb+srv://<user>:<password>@<cluster-url>/?retryWrites=true&w=majority
+   ```
+4. **Chạy local**: copy file `.env.example` thành `.env`, dán connection string vào biến `MONGODB_URI` (file `.env` đã được `.gitignore` loại trừ, không lo lộ mật khẩu).
+5. **Deploy trên Render**: vào service → tab **Environment** → thêm biến môi trường `MONGODB_URI` với giá trị connection string tương tự.
+
+Nếu chưa cấu hình `MONGODB_URI`, server sẽ báo lỗi ngay khi khởi động — đây là kiểm tra chủ đích để tránh chạy nhầm mà không có nơi lưu dữ liệu.
 
 ## Vì sao cách này khác bản demo trước?
 

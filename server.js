@@ -1,3 +1,4 @@
+require("dotenv").config();
 const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
@@ -24,18 +25,18 @@ app.use(express.static(path.join(__dirname, "public")));
 app.use(express.json());
 
 // ---- API: lịch sử trận đấu & báo cáo ----
-app.get("/api/games", (req, res) => {
-  res.json(db.listGames());
+app.get("/api/games", async (req, res) => {
+  res.json(await db.listGames());
 });
 
-app.get("/api/games/:id/detail", (req, res) => {
-  const g = db.getGame(req.params.id);
+app.get("/api/games/:id/detail", async (req, res) => {
+  const g = await db.getGame(req.params.id);
   if (!g) return res.status(404).json({ error: "Không tìm thấy trận đấu." });
   res.json(g);
 });
 
-app.delete("/api/games/:id", (req, res) => {
-  const ok = db.deleteGame(req.params.id);
+app.delete("/api/games/:id", async (req, res) => {
+  const ok = await db.deleteGame(req.params.id);
   if (!ok) return res.status(404).json({ error: "Không tìm thấy trận đấu." });
   res.json({ ok: true });
 });
@@ -48,38 +49,38 @@ app.get("/api/rooms/:code", (req, res) => {
 });
 
 // ---- API: bộ câu hỏi (đề thi có thể lưu và tái sử dụng) ----
-app.get("/api/question-sets", (req, res) => {
-  res.json(db.listQuestionSets());
+app.get("/api/question-sets", async (req, res) => {
+  res.json(await db.listQuestionSets());
 });
 
-app.get("/api/question-sets/:id", (req, res) => {
-  const set = db.getQuestionSet(req.params.id);
+app.get("/api/question-sets/:id", async (req, res) => {
+  const set = await db.getQuestionSet(req.params.id);
   if (!set) return res.status(404).json({ error: "Không tìm thấy bộ câu hỏi." });
   res.json(set);
 });
 
-app.post("/api/question-sets", (req, res) => {
+app.post("/api/question-sets", async (req, res) => {
   const { name, duration, questions } = req.body || {};
-  const set = db.createQuestionSet({ name, duration, questions });
+  const set = await db.createQuestionSet({ name, duration, questions });
   if (!set) return res.status(400).json({ error: "Cần ít nhất 1 câu hỏi hợp lệ (có đủ 4 đáp án)." });
   res.json(set);
 });
 
-app.put("/api/question-sets/:id", (req, res) => {
+app.put("/api/question-sets/:id", async (req, res) => {
   const { name, duration, questions } = req.body || {};
-  const set = db.updateQuestionSet(req.params.id, { name, duration, questions });
+  const set = await db.updateQuestionSet(req.params.id, { name, duration, questions });
   if (!set) return res.status(400).json({ error: "Không tìm thấy bộ câu hỏi hoặc dữ liệu không hợp lệ." });
   res.json(set);
 });
 
-app.delete("/api/question-sets/:id", (req, res) => {
-  const ok = db.deleteQuestionSet(req.params.id);
+app.delete("/api/question-sets/:id", async (req, res) => {
+  const ok = await db.deleteQuestionSet(req.params.id);
   if (!ok) return res.status(404).json({ error: "Không tìm thấy bộ câu hỏi." });
   res.json({ ok: true });
 });
 
-app.get("/api/games/:id/report.csv", (req, res) => {
-  const g = db.getGame(req.params.id);
+app.get("/api/games/:id/report.csv", async (req, res) => {
+  const g = await db.getGame(req.params.id);
   if (!g) return res.status(404).send("Không tìm thấy trận đấu.");
   const csv = buildCsvReport(g);
   res.setHeader("Content-Type", "text/csv; charset=utf-8");
@@ -139,7 +140,7 @@ function leaderboard(room) {
 
 io.on("connection", (socket) => {
   // ---- HOST: tạo phòng ----
-  socket.on("host:create", (payload, cb) => {
+  socket.on("host:create", async (payload, cb) => {
     const questionSetId = payload && payload.questionSetId;
     let code;
     do { code = genCode(); } while (rooms[code]);
@@ -147,7 +148,7 @@ io.on("connection", (socket) => {
     let questions = DEFAULT_QUESTIONS;
     let duration = QUESTION_DURATION;
     if (questionSetId) {
-      const set = db.getQuestionSet(questionSetId);
+      const set = await db.getQuestionSet(questionSetId);
       if (set && Array.isArray(set.questions) && set.questions.length > 0) {
         questions = set.questions;
         if (set.duration > 0) duration = set.duration * 1000;
@@ -226,14 +227,14 @@ io.on("connection", (socket) => {
   });
 
   // ---- HOST: chuyển câu tiếp theo ----
-  socket.on("host:next", () => {
+  socket.on("host:next", async () => {
     const code = socket.data.roomCode;
     const room = rooms[code];
     if (!room) return;
     const nextIdx = room.currentIndex + 1;
     if (nextIdx >= room.questions.length) {
       room.phase = "ended";
-      const gameId = saveRoomHistory(code);
+      const gameId = await saveRoomHistory(code);
       io.to(code).emit("game:ended", { leaderboard: leaderboard(room), gameId });
     } else {
       startQuestion(code, nextIdx);
@@ -290,7 +291,7 @@ function endQuestion(code) {
   io.to(code).emit("game:results", { leaderboard: leaderboard(room) });
 }
 
-function saveRoomHistory(code) {
+async function saveRoomHistory(code) {
   const room = rooms[code];
   if (!room) return null;
 
