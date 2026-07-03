@@ -99,6 +99,7 @@
   .opt:not(:disabled):hover{transform:translateY(-2px);}
   .opt:not(:disabled):active{transform:translateY(4px); box-shadow:none !important;}
   .opt:disabled{opacity:.45; cursor:default; box-shadow:none;}
+  .opt.selected:disabled{opacity:1; box-shadow:0 0 0 3px var(--gold), 0 8px 22px rgba(0,0,0,.35); transform:scale(1.02);}
   .opt-logo{width:28px; height:28px; border-radius:9px; background:#fff; display:flex; align-items:center; justify-content:center; flex-shrink:0; box-shadow:0 2px 6px rgba(0,0,0,.18);}
   .opt-logo span{font-family:'Luckiest Guy',cursive; font-weight:400; font-size:16px; line-height:1; display:block;}
   .leader-row{display:flex; align-items:center; justify-content:space-between; background:rgba(58,45,120,.16); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); border:1px solid rgba(255,255,255,.35); border-radius:12px; padding:12px 16px; margin-bottom:8px; animation:rowIn .5s ease both;}
@@ -599,6 +600,7 @@ function bind(){
       if(state.role!=="player" || state.answered) return;
       state.answered=true;
       document.querySelectorAll(".opt[data-choice]").forEach(x=>x.disabled=true);
+      btn.classList.add("selected");
       socket.emit("player:answer", { choice: parseInt(btn.dataset.choice) });
     };
   });
