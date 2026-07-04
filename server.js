@@ -126,16 +126,57 @@ function buildCsvReport(g) {
 }
 
 // Lưu trạng thái các phòng trong bộ nhớ server (mất khi restart server — phù hợp demo/quy mô vừa)
-const rooms = {}; // { code: { questions, currentIndex, phase, phaseStartTime, duration, hostSocketId, players: {socketId:{name,score}}, answers: {qIdx:{socketId:{choice,correct,points}}} } }
+const rooms = {}; // { code: { questions, currentIndex, phase, phaseStartTime, duration, hostSocketId, players: {clientId:{name,score}}, answers: {qIdx:{clientId:{choice,correct,points}}}, socketToClient: {socketId:clientId} } }
 
 function genCode() {
   return String(Math.floor(1000 + Math.random() * 9000));
 }
 
+function genClientId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+}
+
+// Trạng thái hiện tại của phòng để 1 client vừa (re)connect bắt kịp đúng màn hình
+function buildResumePayload(room, clientId) {
+  if (room.phase === "question") {
+    return {
+      phase: "question",
+      index: room.currentIndex,
+      total: room.questions.length,
+      question: room.questions[room.currentIndex].q,
+      options: room.questions[room.currentIndex].options,
+      duration: room.duration,
+      startTime: room.phaseStartTime,
+    };
+  }
+  if (room.phase === "results") {
+    const qAnswers = room.answers[room.currentIndex] || {};
+    const myAnswer = clientId ? qAnswers[clientId] : null;
+    return {
+      phase: "results",
+      leaderboard: leaderboard(room),
+      previousLeaderboard: room.lastPreviousLeaderboard || leaderboard(room),
+      isFirstQuestion: room.currentIndex === 0,
+      question: room.questions[room.currentIndex].q,
+      options: room.questions[room.currentIndex].options,
+      correctIndex: room.lastCorrectIndex,
+      correctText: room.lastCorrectText,
+      explanation: room.lastExplanation || "",
+      chosenIndex: myAnswer ? myAnswer.choice : null,
+      lastCorrect: myAnswer ? myAnswer.correct : null,
+      lastPoints: myAnswer ? myAnswer.points : 0,
+    };
+  }
+  if (room.phase === "ended") {
+    return { phase: "ended", leaderboard: leaderboard(room), gameId: room.lastGameId };
+  }
+  return null;
+}
+
 function leaderboard(room) {
-  return Object.values(room.players)
-    .sort((a, b) => b.score - a.score)
-    .map((p) => ({ name: p.name, score: p.score }));
+  return Object.entries(room.players)
+    .map(([cid, p]) => ({ clientId: cid, name: p.name, icon: p.icon, score: p.score }))
+    .sort((a, b) => b.score - a.score);
 }
 
 io.on("connection", (socket) => {
@@ -164,6 +205,7 @@ io.on("connection", (socket) => {
       hostSocketId: socket.id,
       players: {},
       answers: {},
+      socketToClient: {},
     };
     socket.join(code);
     socket.data.role = "host";
@@ -171,22 +213,37 @@ io.on("connection", (socket) => {
     cb({ ok: true, code, totalQuestions: questions.length });
   });
 
-  // ---- PLAYER: tham gia phòng ----
-  socket.on("player:join", ({ code, name, icon }, cb) => {
+  // ---- PLAYER: tham gia phòng (hoặc rejoin sau khi mất kết nối tạm thời) ----
+  socket.on("player:join", ({ code, name, icon, clientId }, cb) => {
     const room = rooms[code];
     if (!room) return cb({ ok: false, error: "Không tìm thấy phòng với mã này." });
-    if (room.phase !== "lobby") return cb({ ok: false, error: "Phòng đã bắt đầu chơi, không thể vào lúc này." });
+
+    const cid = typeof clientId === "string" && clientId ? clientId : genClientId();
+    const isRejoin = !!room.players[cid];
+    if (room.phase !== "lobby" && !isRejoin) {
+      return cb({ ok: false, error: "Phòng đã bắt đầu chơi, không thể vào lúc này." });
+    }
 
     const safeIcon = typeof icon === "string" ? icon.slice(0, 2).toUpperCase() : (name || "?").slice(0, 1).toUpperCase();
-    room.players[socket.id] = { name: name.slice(0, 20), icon: safeIcon, score: 0 };
+    if (isRejoin) {
+      // Giữ nguyên điểm số đã có, chỉ cập nhật lại tên/icon nếu đổi
+      room.players[cid].name = name.slice(0, 20) || room.players[cid].name;
+      room.players[cid].icon = safeIcon;
+    } else {
+      room.players[cid] = { name: name.slice(0, 20), icon: safeIcon, score: 0 };
+    }
+    room.socketToClient[socket.id] = cid;
     socket.join(code);
     socket.data.role = "player";
     socket.data.roomCode = code;
+    socket.data.clientId = cid;
 
-    cb({ ok: true, code, totalQuestions: room.questions.length });
-    io.to(code).emit("lobby:update", {
-      players: Object.values(room.players).map((p) => ({ name: p.name, icon: p.icon })),
-    });
+    cb({ ok: true, code, clientId: cid, totalQuestions: room.questions.length, resume: buildResumePayload(room, cid) });
+    if (room.phase === "lobby") {
+      io.to(code).emit("lobby:update", {
+        players: Object.values(room.players).map((p) => ({ name: p.name, icon: p.icon })),
+      });
+    }
   });
 
   // ---- HOST: bắt đầu game ----
@@ -201,24 +258,53 @@ io.on("connection", (socket) => {
     const code = socket.data.roomCode;
     const room = rooms[code];
     if (!room || room.phase !== "question") return;
+    const cid = socket.data.clientId;
+    if (!cid || !room.players[cid]) return;
 
     const qIdx = room.currentIndex;
     if (!room.answers[qIdx]) room.answers[qIdx] = {};
-    if (room.answers[qIdx][socket.id]) return; // đã trả lời rồi, không cho gửi lại
+    if (room.answers[qIdx][cid]) return; // đã trả lời rồi, không cho gửi lại
 
     const q = room.questions[qIdx];
     const remaining = Math.max(0, room.phaseStartTime + room.duration - Date.now());
     const correct = choice === q.correct;
     const points = correct ? Math.round(500 + 500 * (remaining / room.duration)) : 0;
 
-    room.answers[qIdx][socket.id] = { choice, correct, points, ts: Date.now() };
-    if (room.players[socket.id]) room.players[socket.id].score += points;
+    room.answers[qIdx][cid] = { choice, correct, points, ts: Date.now() };
+    room.players[cid].score += points;
 
     socket.emit("answer:ack", { correct, points });
-    io.to(room.hostSocketId).emit("answer:count", {
-      answered: Object.keys(room.answers[qIdx]).length,
-      total: Object.keys(room.players).length,
+    const answeredCount = Object.keys(room.answers[qIdx]).length;
+    const totalPlayers = Object.keys(room.players).length;
+    io.to(room.hostSocketId).emit("answer:count", { answered: answeredCount, total: totalPlayers });
+
+    // Tu dong ket thuc cau hoi ngay khi 100% nguoi choi da tra loi, khong can cho het gio
+    if (totalPlayers > 0 && answeredCount >= totalPlayers) {
+      endQuestion(code);
+    }
+  });
+
+  // ---- PLAYER: xem kết quả từng câu của riêng mình (dùng ở màn kết quả chung cuộc) ----
+  socket.on("player:myResults", (payload, cb) => {
+    const code = socket.data.roomCode;
+    const room = rooms[code];
+    const cid = socket.data.clientId;
+    if (!room || !cid || !room.players[cid]) return cb({ ok: false });
+
+    const perQuestion = room.questions.map((q, qIdx) => {
+      const a = (room.answers[qIdx] || {})[cid];
+      return {
+        questionIndex: qIdx,
+        question: q.q,
+        answered: !!a,
+        correct: a ? !!a.correct : false,
+        points: a ? a.points : 0,
+      };
     });
+    const board = leaderboard(room);
+    const rank = board.findIndex((p) => p.clientId === cid) + 1;
+    const me = room.players[cid];
+    cb({ ok: true, perQuestion, rank, name: me.name, icon: me.icon, score: me.score, total: board.length });
   });
 
   // ---- HOST: kết thúc câu hỏi sớm ----
@@ -235,6 +321,7 @@ io.on("connection", (socket) => {
     if (nextIdx >= room.questions.length) {
       room.phase = "ended";
       const gameId = await saveRoomHistory(code);
+      room.lastGameId = gameId;
       io.to(code).emit("game:ended", { leaderboard: leaderboard(room), gameId });
     } else {
       startQuestion(code, nextIdx);
@@ -246,13 +333,18 @@ io.on("connection", (socket) => {
     const room = rooms[code];
     if (!room) return;
     if (socket.data.role === "player") {
-      // Chỉ xoá khỏi danh sách khi còn ở sảnh chờ. Sau khi đã bắt đầu chơi, vẫn giữ lại
-      // để điểm số và lịch sử trả lời của người đó không bị mất khỏi báo cáo cuối trận.
+      const cid = socket.data.clientId;
+      delete room.socketToClient[socket.id];
+      // Chỉ xoá khỏi danh sách khi còn ở sảnh chờ VÀ không còn socket nào khác của cùng
+      // client này đang giữ kết nối (tránh mất người khi họ chỉ đang reconnect tạm thời).
       if (room.phase === "lobby") {
-        delete room.players[socket.id];
-        io.to(code).emit("lobby:update", {
-          players: Object.values(room.players).map((p) => ({ name: p.name, icon: p.icon })),
-        });
+        const stillConnected = Object.values(room.socketToClient).includes(cid);
+        if (!stillConnected) {
+          delete room.players[cid];
+          io.to(code).emit("lobby:update", {
+            players: Object.values(room.players).map((p) => ({ name: p.name, icon: p.icon })),
+          });
+        }
       }
     }
     // Nếu host rời đi, phòng vẫn giữ nguyên trong bộ nhớ cho tới khi server restart (demo đơn giản).
@@ -266,6 +358,10 @@ function startQuestion(code, idx) {
   room.phase = "question";
   room.phaseStartTime = Date.now();
   room.answers[idx] = {};
+  // Chụp lại điểm số của mọi người NGAY TRƯỚC câu hỏi này, để sau khi kết thúc có thể
+  // animate phần điểm vừa cộng thêm (từ điểm cũ -> điểm mới) trên bảng xếp hạng.
+  room.scoresBeforeQuestion = {};
+  for (const [cid, p] of Object.entries(room.players)) room.scoresBeforeQuestion[cid] = p.score;
   if (!room.startedAt) room.startedAt = room.phaseStartTime;
   if (!room.questionStartTimes) room.questionStartTimes = {};
   room.questionStartTimes[idx] = room.phaseStartTime;
@@ -283,12 +379,33 @@ function startQuestion(code, idx) {
   room._timer = setTimeout(() => endQuestion(code), room.duration + 300);
 }
 
+// Bảng xếp hạng TRƯỚC câu hỏi vừa rồi (dùng điểm đã chụp lại lúc bắt đầu câu hỏi),
+// để client animate phần điểm mới cộng thêm.
+function previousLeaderboard(room) {
+  const before = room.scoresBeforeQuestion || {};
+  return Object.entries(room.players)
+    .map(([cid, p]) => ({ clientId: cid, name: p.name, icon: p.icon, score: before[cid] || 0 }))
+    .sort((a, b) => b.score - a.score);
+}
+
 function endQuestion(code) {
   const room = rooms[code];
   if (!room || room.phase !== "question") return;
   clearTimeout(room._timer);
   room.phase = "results";
-  io.to(code).emit("game:results", { leaderboard: leaderboard(room) });
+  const q = room.questions[room.currentIndex];
+  room.lastCorrectIndex = q.correct;
+  room.lastCorrectText = q.options[q.correct];
+  room.lastExplanation = q.explanation || "";
+  room.lastPreviousLeaderboard = previousLeaderboard(room);
+  io.to(code).emit("game:results", {
+    leaderboard: leaderboard(room),
+    previousLeaderboard: room.lastPreviousLeaderboard,
+    correctIndex: room.lastCorrectIndex,
+    correctText: room.lastCorrectText,
+    explanation: room.lastExplanation,
+    isFirstQuestion: room.currentIndex === 0,
+  });
 }
 
 async function saveRoomHistory(code) {
