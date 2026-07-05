@@ -346,8 +346,12 @@ io.on("connection", (socket) => {
           });
         }
       }
+    } else if (socket.data.role === "host" && room.hostSocketId === socket.id) {
+      // Host rời phòng (đóng tab / thoát) -> đá toàn bộ người chơi về màn hình tham gia, dọn phòng.
+      clearTimeout(room._timer);
+      io.to(code).emit("room:closed");
+      delete rooms[code];
     }
-    // Nếu host rời đi, phòng vẫn giữ nguyên trong bộ nhớ cho tới khi server restart (demo đơn giản).
   });
 });
 

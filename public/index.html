@@ -61,8 +61,8 @@
   .badge{display:inline-flex; align-items:center; gap:6px; background:rgba(45,212,191,.14); color:var(--teal); border:1px solid rgba(45,212,191,.35); font-weight:600; font-size:13px; padding:5px 11px; border-radius:999px;}
   .badge.badge-dark{background:rgba(36,27,77,.85); color:#fff; border-color:rgba(255,255,255,.16); font-size:15px; padding:8px 16px; box-shadow:0 4px 14px rgba(0,0,0,0.2);}
   .badge.dim{background:rgba(169,164,217,.12); color:var(--text-dim); border-color:var(--line);}
-  .player-chip{background:var(--panel-2); border:1px solid var(--line); border-radius:10px; padding:6px 12px 6px 6px; font-size:14px; font-weight:600; display:flex; align-items:center; gap:8px;}
-  .player-list{display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; max-height:220px; overflow:auto;}
+  .player-chip{background:var(--panel-2); border:1px solid var(--line); border-radius:10px; padding:6px 12px 6px 6px; font-size:14px; font-weight:600; display:flex; align-items:center; gap:8px; flex:0 0 auto; align-self:flex-start;}
+  .player-list{display:flex; flex-wrap:wrap; align-content:flex-start; align-items:flex-start; gap:8px; margin-top:14px; max-height:220px; overflow:auto;}
   .avatar{width:28px;height:28px;border-radius:50%; background:var(--primary); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12px; flex-shrink:0;}
   .avatar.lg{width:56px;height:56px;font-size:20px;}
   .qr-box{background:#fff; padding:10px; border-radius:12px; display:inline-flex; align-items:center; justify-content:center; cursor:zoom-in; transition:transform .15s;}
@@ -150,20 +150,19 @@
   .podium-heading{font-family:'Luckiest Guy',cursive; font-weight:400; font-size:clamp(24px,5.6vw,34px); letter-spacing:1px; color:var(--text); margin:20px 0 0 0; text-align:center; flex:0 0 auto;}
   .podium-stage{flex:1 1 0%; min-height:0; width:100%; display:flex; align-items:center; justify-content:center;}
   .podium-row{width:100%; display:flex; align-items:flex-end; justify-content:center; gap:clamp(6px,1.8vw,14px); padding:0 4px; position:relative; z-index:1;}
-  .podium-slot{flex:0 0 auto; width:clamp(88px,24vw,132px); display:flex; flex-direction:column; align-items:center; transform-origin:center bottom; animation:podiumSlideUp .5s cubic-bezier(.34,1.4,.64,1) both;}
+  .podium-slot{flex:0 0 auto; width:clamp(96px,26vw,160px); display:flex; flex-direction:column; align-items:center; transform-origin:center bottom; animation:podiumSlideUp .8s cubic-bezier(.34,1.4,.64,1) both;}
   @keyframes podiumSlideUp{from{opacity:0; transform:translateY(36px);} to{opacity:1; transform:translateY(0);}}
   .podium-slot.rank2{order:1;}
   .podium-slot.rank1{order:2;}
   .podium-slot.rank3{order:3;}
-  .podium-slot .avatar{width:clamp(48px,10.5vw,68px); height:clamp(48px,10.5vw,68px); font-size:clamp(19px,4vw,27px); margin-bottom:8px; box-shadow:0 4px 12px rgba(0,0,0,.25); border:3px solid #fff;}
-  .podium-slot .p-name{font-weight:800; font-size:clamp(14px,3.4vw,18px); color:var(--text); text-align:center; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
-  .podium-slot .p-score{font-family:Arial,sans-serif; font-weight:800; color:var(--gold); font-size:clamp(15px,3.6vw,20px); margin-bottom:8px;}
+  .podium-slot .avatar{width:clamp(52px,11.5vw,80px); height:clamp(52px,11.5vw,80px); font-size:clamp(20px,4.4vw,30px); margin-bottom:8px; box-shadow:0 4px 12px rgba(0,0,0,.25); border:3px solid #fff;}
+  .podium-slot .p-name{font-weight:800; font-size:clamp(15px,3.6vw,20px); color:var(--text); text-align:center; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .podium-slot .p-score{font-family:Arial,sans-serif; font-weight:800; color:var(--gold); font-size:clamp(16px,3.8vw,22px); margin-bottom:8px;}
   .podium-block{width:100%; border-radius:10px 10px 0 0; display:flex; align-items:flex-start; justify-content:center; padding-top:8px; font-family:'Luckiest Guy',cursive; font-weight:400; color:#fff; text-shadow:0 2px 4px rgba(0,0,0,.3);}
-  .podium-slot.rank1 .podium-block{height:clamp(70px,14vh,116px); background:linear-gradient(180deg,#FFE38A,var(--gold)); font-size:clamp(22px,5vw,30px); box-shadow:0 -4px 18px rgba(255,201,60,.4);}
-  .podium-slot.rank2 .podium-block{height:clamp(52px,10.5vh,86px); background:linear-gradient(180deg,#E4E9F2,#AEB8C9); font-size:clamp(19px,4.2vw,26px);}
-  .podium-slot.rank3 .podium-block{height:clamp(40px,8.5vh,66px); background:linear-gradient(180deg,#F0B87E,#C97A3D); font-size:clamp(19px,4.2vw,26px);}
-  .podium-slot.rank1.spotlight .avatar{box-shadow:0 0 0 6px rgba(255,201,60,.35), 0 6px 20px rgba(0,0,0,.3); animation:spotlightPulse 1.4s ease-in-out infinite;}
-  @keyframes spotlightPulse{0%,100%{box-shadow:0 0 0 6px rgba(255,201,60,.35), 0 6px 20px rgba(0,0,0,.3);} 50%{box-shadow:0 0 0 14px rgba(255,201,60,.12), 0 6px 26px rgba(0,0,0,.32);}}
+  .podium-slot.rank1 .podium-block{height:clamp(80px,16vh,140px); background:linear-gradient(180deg,#FFE38A,var(--gold)); font-size:clamp(24px,5.4vw,34px); box-shadow:0 -4px 18px rgba(255,201,60,.4);}
+  .podium-slot.rank2 .podium-block{height:clamp(60px,12vh,105px); background:linear-gradient(180deg,#E4E9F2,#AEB8C9); font-size:clamp(21px,4.6vw,28px);}
+  .podium-slot.rank3 .podium-block{height:clamp(46px,9.5vh,80px); background:linear-gradient(180deg,#F0B87E,#C97A3D); font-size:clamp(21px,4.6vw,28px);}
+  .podium-crown{width:100%; text-align:center; font-size:clamp(24px,5.6vw,36px); line-height:1; margin-bottom:6px; filter:drop-shadow(0 3px 5px rgba(0,0,0,.28));}
   .podium-waiting{color:rgba(255,255,255,.9); font-weight:700; font-size:clamp(16px,4vw,20px); text-align:center; margin:auto;}
 
   /* ===== Player: tổng kết cá nhân cuối trận ===== */
@@ -290,6 +289,7 @@
   body.host-stage .leader-row{padding:clamp(10px,1.6vh,16px) 18px; border-radius:14px; font-size:clamp(14px,1.8vh,18px); margin-bottom:clamp(6px,1.2vh,10px);}
   body.host-stage .leader-rank{font-size:clamp(15px,1.8vh,20px); width:38px;}
   body.host-stage .avatar{width:clamp(28px,3.4vh,38px); height:clamp(28px,3.4vh,38px); font-size:clamp(12px,1.6vh,15px);}
+  body.host-stage .podium-slot .avatar{width:clamp(52px,11.5vw,80px); height:clamp(52px,11.5vw,80px); font-size:clamp(20px,4.4vw,30px);}
   body.host-stage .leader-score{font-size:clamp(15px,1.8vh,20px);}
   body.host-stage .rank-change{font-size:clamp(12px,1.4vh,15px);}
 
@@ -597,7 +597,9 @@ function viewPodium(){
   </div>`;
 }
 function podiumSlotHtml(rank, p){
+  const crown = rank===1 ? `<div class="podium-crown">👑</div>` : "";
   return `<div class="podium-slot rank${rank}">
+    ${crown}
     <div class="avatar">${esc(p.icon||p.name.slice(0,1).toUpperCase())}</div>
     <div class="p-name">${esc(p.name)}</div>
     <div class="p-score">${p.score}</div>
@@ -605,18 +607,16 @@ function podiumSlotHtml(rank, p){
   </div>`;
 }
 // Buc truot len tu duoi vao dung vi tri cua no trong hang (CSS animation podiumSlideUp lo
-// phan truot+hien), khong bay ra khoi hang. isTop1 = true se roi spotlight + ban confetti.
+// phan truot+hien), khong bay ra khoi hang. isTop1 = true se ban confetti/phao hoa.
 function revealPodiumRank(rank, player, isTop1){
   const row = el("podium-row");
   if(!row || !player) return Promise.resolve();
   row.insertAdjacentHTML("beforeend", podiumSlotHtml(rank, player));
   if(isTop1){
-    const slotEl = row.lastElementChild;
-    slotEl.classList.add("spotlight");
     const layer = el("fx-layer");
     if(layer){ spawnConfettiBurst(layer, 50); spawnFirework(layer); }
   }
-  return new Promise(resolve=> setTimeout(resolve, 550));
+  return new Promise(resolve=> setTimeout(resolve, 950));
 }
 async function runPodiumSequence(){
   clearTimeout(podiumTimer);
@@ -624,16 +624,16 @@ async function runPodiumSequence(){
   render();
   const top3 = (state.leaderboard || []).slice(0,3);
   if(top3.length===0) return;
-  await new Promise(r=>setTimeout(r, 500));
+  await new Promise(r=>setTimeout(r, 800));
   await revealPodiumRank(3, top3[2], false);
-  await new Promise(r=>setTimeout(r, 250));
+  await new Promise(r=>setTimeout(r, 450));
   await revealPodiumRank(2, top3[1], false);
-  await new Promise(r=>setTimeout(r, 250));
+  await new Promise(r=>setTimeout(r, 450));
   await revealPodiumRank(1, top3[0], true);
   podiumTimer = setTimeout(()=>{
     state.screen = "host_ended";
     render();
-  }, 5000);
+  }, 6000);
 }
 function viewPlayerEnded(){
   const r = state.myResults;
@@ -745,7 +745,7 @@ function runLeaderboardReveal(containerId, prevList, newList, isFirst){
       const newP = newList.find(x=>(x.clientId||x.name)===cid);
       const row = container.querySelector(`[data-cid="${CSS.escape(String(cid))}"]`);
       const scoreEl = row ? row.querySelector(".leader-score") : null;
-      if(scoreEl && newP) animateNumber(scoreEl, p.score, newP.score, 700);
+      if(scoreEl && newP) animateNumber(scoreEl, p.score, newP.score, 1100);
     });
 
     setTimeout(()=>{
@@ -792,12 +792,12 @@ function runLeaderboardReveal(containerId, prevList, newList, isFirst){
           r.style.transition = "none";
           r.style.transform = `translateY(${dy}px)`;
           r.offsetHeight; // ep trinh duyet "chot" vi tri cu truoc khi bat lai transition, tranh bi "pop" thang
-          r.style.transition = "transform .5s cubic-bezier(.34,1.2,.64,1)";
+          r.style.transition = "transform .9s cubic-bezier(.34,1.2,.64,1)";
           r.style.transform = "";
         }
       });
-    }, 900);
-  }, 500);
+    }, 1400);
+  }, 700);
 }
 
 function bind(){
@@ -806,7 +806,10 @@ function bind(){
   b("pick-player", ()=>{ state.screen="player_join"; render(); });
   b("pick-history", ()=>{ location.href="/history.html"; });
   b("pick-admin", ()=>{ location.href="/admin.html"; });
-  b("back-landing", ()=>{ location.href = location.pathname; });
+  b("back-landing", ()=>{
+    if(state.role==="player"){ resetToPlayerJoin(); }
+    else { location.href = location.pathname; }
+  });
   const brandEl = el("brand-home");
   if(brandEl){
     brandEl.onclick = ()=>{ location.href = location.pathname; };
@@ -929,6 +932,19 @@ function fetchMyResults(){
     if(state.screen==="player_ended") render();
   });
 }
+
+// Dua nguoi choi ve man "Tham gia phong" (nhap ma phong/ten/icon) thay vi trang chu chung,
+// dung khi: host thoat phong (room:closed) hoac nguoi choi tu bam "Ve trang chu" sau khi ket thuc.
+function resetToPlayerJoin(){
+  state.role = null; state.code = ""; state.myResults = null;
+  state.leaderboard = null; state.prevRankMap = null; state.gameId = null;
+  state.screen = "player_join";
+  render();
+}
+
+socket.on("room:closed", ()=>{
+  if(state.role==="player") resetToPlayerJoin();
+});
 
 socket.on("game:question", (data)=>{
   applyQuestionData(data);
