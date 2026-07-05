@@ -162,6 +162,7 @@ function buildResumePayload(room, clientId) {
       correctIndex: room.lastCorrectIndex,
       correctText: room.lastCorrectText,
       explanation: room.lastExplanation || "",
+      resultsRevealed: !!room.resultsRevealed,
       chosenIndex: myAnswer ? myAnswer.choice : null,
       lastCorrect: myAnswer ? myAnswer.correct : null,
       lastPoints: myAnswer ? myAnswer.points : 0,
@@ -312,6 +313,16 @@ io.on("connection", (socket) => {
     endQuestion(socket.data.roomCode);
   });
 
+  // ---- HOST: chuyển từ màn "reveal đáp án + giải thích" sang bảng xếp hạng ----
+  // (chỉ cần khi câu hỏi có giải thích — host chủ động bấm thay vì tự động chuyển sau vài giây)
+  socket.on("host:showLeaderboard", () => {
+    const code = socket.data.roomCode;
+    const room = rooms[code];
+    if (!room || socket.data.role !== "host") return;
+    room.resultsRevealed = true;
+    io.to(code).emit("results:show");
+  });
+
   // ---- HOST: chuyển câu tiếp theo ----
   socket.on("host:next", async () => {
     const code = socket.data.roomCode;
@@ -402,6 +413,7 @@ function endQuestion(code) {
   room.lastCorrectText = q.options[q.correct];
   room.lastExplanation = q.explanation || "";
   room.lastPreviousLeaderboard = previousLeaderboard(room);
+  room.resultsRevealed = false;
   io.to(code).emit("game:results", {
     leaderboard: leaderboard(room),
     previousLeaderboard: room.lastPreviousLeaderboard,
