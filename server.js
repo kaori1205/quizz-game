@@ -12,6 +12,10 @@ const io = new Server(server);
 const PORT = process.env.PORT || 3000;
 const QUESTION_DURATION = 20000; // 20 giây mỗi câu
 
+// Danh sách icon avatar hợp lệ (ứng với ảnh trong public/avt) — dùng để kiểm tra
+// icon người chơi gửi lên có hợp lệ không, tránh nhận icon tuỳ ý không xác định.
+const VALID_ICONS = ["avt-1", "avt-2", "avt-3", "avt-4", "avt-5", "avt-6", "avt-7", "avt-8", "avt-9", "avt-10"];
+
 // Bộ câu hỏi mặc định — có thể sửa/thêm tuỳ ý
 const DEFAULT_QUESTIONS = [
   { q: "Thủ đô của Việt Nam là gì?", options: ["TP. Hồ Chí Minh", "Hà Nội", "Đà Nẵng", "Huế"], correct: 1 },
@@ -225,7 +229,7 @@ io.on("connection", (socket) => {
       return cb({ ok: false, error: "Phòng đã bắt đầu chơi, không thể vào lúc này." });
     }
 
-    const safeIcon = typeof icon === "string" ? icon.slice(0, 2).toUpperCase() : (name || "?").slice(0, 1).toUpperCase();
+    const safeIcon = VALID_ICONS.includes(icon) ? icon : (name || "?").slice(0, 1).toUpperCase();
     if (isRejoin) {
       // Giữ nguyên điểm số đã có, chỉ cập nhật lại tên/icon nếu đổi
       room.players[cid].name = name.slice(0, 20) || room.players[cid].name;

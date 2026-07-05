@@ -63,8 +63,9 @@
   .badge.dim{background:rgba(169,164,217,.12); color:var(--text-dim); border-color:var(--line);}
   .player-chip{background:var(--panel-2); border:1px solid var(--line); border-radius:10px; padding:6px 12px 6px 6px; font-size:14px; font-weight:600; display:flex; align-items:center; gap:8px; flex:0 0 auto; align-self:flex-start;}
   .player-list{display:flex; flex-wrap:wrap; align-content:flex-start; align-items:flex-start; gap:8px; margin-top:14px; max-height:220px; overflow:auto;}
-  .avatar{width:28px;height:28px;border-radius:50%; background:var(--primary); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12px; flex-shrink:0;}
-  .avatar.lg{width:56px;height:56px;font-size:20px;}
+  .avatar{width:28px;height:28px;border-radius:50%; background:var(--primary); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12px; flex-shrink:0; overflow:hidden;}
+  .avatar img{width:100%; height:100%; object-fit:cover; display:block;}
+  .avatar.lg{width:56px;height:56px;font-size:20px; border:3px solid #052699;}
   .qr-box{background:#fff; padding:10px; border-radius:12px; display:inline-flex; align-items:center; justify-content:center; cursor:zoom-in; transition:transform .15s;}
   .qr-box:hover{transform:scale(1.03);}
   .qr-modal-overlay{position:fixed; inset:0; background:rgba(20,10,50,.75); backdrop-filter:blur(4px); display:flex; align-items:center; justify-content:center; z-index:50; cursor:zoom-out; padding:24px;}
@@ -81,8 +82,9 @@
   .lobby-code-section .qr-box{justify-self:center; padding:5px;}
   .lobby-players-section{flex:1 1 0%; display:flex; flex-direction:column; min-height:0;}
   .lobby-players-section .player-list{flex:1; max-height:none; overflow:auto;}
-  .icon-picker{display:grid; grid-template-columns:repeat(6,1fr); gap:8px; margin-bottom:16px;}
-  .icon-opt{aspect-ratio:1; border-radius:10px; border:2px solid var(--line); background:var(--panel-2); color:var(--text); display:flex; align-items:center; justify-content:center; font-weight:700; cursor:pointer;}
+  .icon-picker{display:grid; grid-template-columns:repeat(5,1fr); gap:8px; margin-bottom:16px;}
+  .icon-opt{aspect-ratio:1; border-radius:10px; border:2px solid var(--line); background:var(--panel-2); color:var(--text); display:flex; align-items:center; justify-content:center; font-weight:700; cursor:pointer; overflow:hidden; padding:3px;}
+  .icon-opt img{width:100%; height:100%; object-fit:cover; border-radius:7px; display:block; pointer-events:none;}
   .icon-opt.active{border-color:var(--primary); background:var(--primary); color:#fff;}
   .tabs{display:flex; gap:8px; width:100%; margin-bottom:14px;}
   .tab-btn{flex:1; padding:11px; border-radius:12px; border:1px solid var(--line); background:var(--panel-2); color:var(--text-dim); font-weight:700; cursor:pointer;}
@@ -353,7 +355,19 @@ const SHAPES = {
   yellow:`<span class="opt-logo"><span style="color:var(--a-yellow)">V</span></span>`,
   green:`<span class="opt-logo"><span style="color:var(--a-green)">V</span></span>`,
 };
-const ICON_OPTS = ["A","B","C","D","E","F","G","H","I","J","K","L"];
+// Anh avatar co san trong public/avt — key la "ma icon" luu trong du lieu nguoi choi,
+// value la ten file thuc te (co doi .webp/.jpg tuy anh).
+const AVT_FILES = {
+  "avt-1":"avt-1.webp", "avt-2":"avt-2.jpg", "avt-3":"avt-3.jpg", "avt-4":"avt-4.webp", "avt-5":"avt-5.jpg",
+  "avt-6":"avt-6.jpg", "avt-7":"avt-7.jpg", "avt-8":"avt-8.jpg", "avt-9":"avt-9.webp", "avt-10":"avt-10.jpg",
+};
+const ICON_OPTS = Object.keys(AVT_FILES);
+// Tra ve HTML cho 1 avatar: anh neu icon la ma anh hop le, khong thi rot ve chu cai dau ten (fallback cu).
+function avatarHtml(icon, name){
+  const file = AVT_FILES[icon];
+  if(file) return `<img src="/avt/${file}" alt="">`;
+  return esc((icon || name || "?").slice(0,1).toUpperCase());
+}
 
 const urlParams = new URLSearchParams(location.search);
 const joinCodeFromUrl = urlParams.get("join");
@@ -639,7 +653,7 @@ function podiumSlotHtml(rank, p){
   const crown = rank===1 ? `<div class="podium-crown">👑</div>` : "";
   return `<div class="podium-slot rank${rank}">
     ${crown}
-    <div class="avatar">${esc(p.icon||p.name.slice(0,1).toUpperCase())}</div>
+    <div class="avatar">${avatarHtml(p.icon, p.name)}</div>
     <div class="p-name">${esc(p.name)}</div>
     <div class="p-score">${p.score}</div>
     <div class="podium-block">${rank}</div>
@@ -692,7 +706,7 @@ function viewPlayerEnded(){
   return `<div class="card ended-card">
   <h2 class="center" style="margin-top:0">Kết quả chung cuộc</h2>
   <div class="me-summary">
-    <div class="avatar">${esc(r.icon||r.name.slice(0,1).toUpperCase())}</div>
+    <div class="avatar">${avatarHtml(r.icon, r.name)}</div>
     <div class="me-info">
       <div class="me-name">${esc(r.name)}</div>
       <div class="me-rank">Hạng ${r.rank}/${r.total}</div>
@@ -714,14 +728,14 @@ function viewPlayerJoin(){
   <label>Tên hiển thị</label><input id="join-name" placeholder="Biệt danh của bạn" maxlength="18" style="margin-bottom:16px"/>
   <label>Chọn icon nhân vật</label>
   <div class="icon-picker" id="icon-picker">
-    ${ICON_OPTS.map(ic=>`<div class="icon-opt ${ic===state.selectedIcon?"active":""}" data-icon="${ic}">${ic}</div>`).join("")}
+    ${ICON_OPTS.map(ic=>`<div class="icon-opt ${ic===state.selectedIcon?"active":""}" data-icon="${ic}"><img src="/avt/${AVT_FILES[ic]}" alt=""></div>`).join("")}
   </div>
   <p class="muted" id="join-error" style="color:#DC2626"></p>
   <button class="primary block" id="do-join">Tham gia ngay</button></div>`;
 }
 function viewPlayerWait(){
   return `<div class="card center"><div class="badge">Đã vào phòng ${state.code}</div>
-  <div class="avatar lg" style="margin:18px auto 0">${esc(state.selectedIcon)}</div>
+  <div class="avatar lg" style="margin:18px auto 0">${avatarHtml(state.selectedIcon, state.playerName)}</div>
   <p class="muted" style="margin-top:14px">Đang chờ host bắt đầu trò chơi…</p></div>`;
 }
 function buildRankMap(list){
@@ -744,7 +758,7 @@ function leaderRowHtml(p, rank, prevRank, delay){
   const delayStyle = delay!=null ? ` style="animation-delay:${delay.toFixed(2)}s"` : "";
   return `<div class="leader-row${topClass}" data-cid="${esc(cid)}"${delayStyle}>
     <div class="leader-rank">${rankIcon(rank)}</div>
-    <div class="avatar" style="margin-right:8px">${esc(p.icon||p.name.slice(0,1).toUpperCase())}</div>
+    <div class="avatar" style="margin-right:8px">${avatarHtml(p.icon, p.name)}</div>
     <div class="leader-name">${esc(p.name)}</div>
     ${changeHtml}
     <div class="leader-score">${p.score}</div>
@@ -918,7 +932,7 @@ function startTimerLoop(){
 // ---- Socket events ----
 socket.on("lobby:update", ({players})=>{
   const c = el("lobby-count"); if(c) c.innerText = players.length? `${players.length} người đã tham gia` : "Đang chờ người chơi…";
-  const l = el("lobby-players"); if(l) l.innerHTML = players.map(p=>`<div class="player-chip"><div class="avatar">${esc(p.icon||p.name.slice(0,1).toUpperCase())}</div>${esc(p.name)}</div>`).join("");
+  const l = el("lobby-players"); if(l) l.innerHTML = players.map(p=>`<div class="player-chip"><div class="avatar">${avatarHtml(p.icon, p.name)}</div>${esc(p.name)}</div>`).join("");
 });
 
 function applyQuestionData(data){
