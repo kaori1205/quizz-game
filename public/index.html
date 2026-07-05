@@ -94,7 +94,13 @@
   .timer-num{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-family:Arial,sans-serif; font-weight:700; font-size:22px;}
   .question-text{font-family:Arial,sans-serif; font-size:clamp(18px,5vw,24px); font-weight:600; line-height:1.35; margin:6px 0 18px; word-break:break-word;}
   .opts{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
-  .opt{display:flex; align-items:center; gap:10px; border-radius:14px; padding:18px 16px; font-family:Arial,sans-serif; font-weight:700; font-size:16px; color:#fff; cursor:pointer; border:none; text-align:left; min-height:64px; transition:transform .12s,box-shadow .12s,opacity .12s;}
+  .opt{display:flex; align-items:center; gap:10px; border-radius:14px; padding:18px 16px; font-family:Arial,sans-serif; font-weight:700; font-size:16px; line-height:1.25; color:#fff; cursor:pointer; border:none; text-align:left; min-height:64px; transition:transform .12s,box-shadow .12s,opacity .12s;}
+  .opt.opt-md{font-size:14px; padding:14px 14px; gap:8px;}
+  .opt.opt-sm{font-size:12.5px; padding:12px 12px; gap:7px;}
+  .opt.opt-xs{font-size:11.5px; padding:10px 10px; gap:6px; line-height:1.2;}
+  body.host-stage .opt.opt-md{font-size:clamp(13px,1.7vh,17px);}
+  body.host-stage .opt.opt-sm{font-size:clamp(12px,1.5vh,15px);}
+  body.host-stage .opt.opt-xs{font-size:clamp(11px,1.3vh,13px);}
   .opt.red{background:var(--a-red); box-shadow:0 6px 0 0 #C23140;} .opt.blue{background:var(--a-blue); box-shadow:0 6px 0 0 #1560B0;} .opt.yellow{background:var(--a-yellow); box-shadow:0 6px 0 0 #C98600;} .opt.green{background:var(--a-green); box-shadow:0 6px 0 0 #1F9E5A;}
   .opt:not(:disabled):hover{transform:translateY(-2px);}
   .opt:not(:disabled):active{transform:translateY(4px); box-shadow:none !important;}
@@ -213,13 +219,19 @@
     .question-text{font-size:clamp(22px,2.4vw,28px);}
   }
 
+  /* ===== Responsive: dien thoai (kich thuoc man hinh nho) — 4 dap an xep 1 cot theo
+     hang ngang thay vi luoi 2x2, giup doc de hon va tranh khung bi keo gian vi text dai ===== */
+  @media (max-width:600px){
+    .opts{grid-template-columns:1fr; gap:10px;}
+    .qa-answers .opts{grid-template-rows:repeat(4,1fr);}
+  }
+
   /* ===== Responsive: small phones ===== */
   @media (max-width:380px){
     body{padding:24px 12px;}
     .card{padding:18px 14px;}
     .role-pick{grid-template-columns:1fr; gap:12px;}
     .role-btn{padding:22px 14px; font-size:17px;}
-    .opts{grid-template-columns:1fr; gap:10px;}
     .opt{padding:14px 12px; min-height:52px; font-size:15px;}
     .icon-picker{grid-template-columns:repeat(4,1fr);}
     .avatar.lg{width:44px; height:44px; font-size:16px;}
@@ -227,7 +239,6 @@
     .timer-ring svg{width:52px; height:52px;}
     .code-plaque{letter-spacing:3px;}
     .card.qa-card, .card.lb-card, .card.ended-card{min-height:clamp(380px,72vh,600px);}
-    .qa-answers .opts{grid-template-rows:repeat(4,1fr);}
     .question-box{padding:16px 16px;}
     .badge.badge-dark{font-size:13px; padding:6px 12px;}
   }
@@ -531,7 +542,7 @@ function viewQuestion(isHost){
   </div>
   <div class="qa-question"><div class="question-box"><div class="question-text">${esc(state.question)}</div></div></div>
   <div class="qa-answers"><div class="opts">
-    ${state.options.map((o,i)=>`<button class="opt ${OPT_CLASSES[i]}" data-choice="${i}" ${isHost||state.answered?"disabled":""} style="${isHost?"cursor:default":""}">${SHAPES[OPT_CLASSES[i]]}<span>${esc(o)}</span></button>`).join("")}
+    ${state.options.map((o,i)=>`<button class="opt ${OPT_CLASSES[i]}${optSizeClass(o)}" data-choice="${i}" ${isHost||state.answered?"disabled":""} style="${isHost?"cursor:default":""}">${SHAPES[OPT_CLASSES[i]]}<span>${esc(o)}</span></button>`).join("")}
   </div></div>
   <div class="qa-footer">
   ${isHost
@@ -540,12 +551,21 @@ function viewQuestion(isHost){
   </div>
   </div>`;
 }
+// Dap an cang dai (nhieu chu, de xuong nhieu dong) thi chu cang nho lai, tranh khung
+// bi keo gian qua cao tren man hinh hep — giu giao dien dong nhat giua cac cau hoi/thiet bi.
+function optSizeClass(text){
+  const len = (text||"").length;
+  if(len > 100) return " opt-xs";
+  if(len > 70) return " opt-sm";
+  if(len > 45) return " opt-md";
+  return "";
+}
 function renderRevealOptions(){
   return state.options.map((o,i)=>{
     let extra = "";
     if(i===state.correctIndex) extra = " reveal-correct";
     else if(state.chosenIndex!=null && i===state.chosenIndex) extra = " reveal-wrong";
-    return `<button class="opt ${OPT_CLASSES[i]}${extra}" disabled>${SHAPES[OPT_CLASSES[i]]}<span>${esc(o)}</span></button>`;
+    return `<button class="opt ${OPT_CLASSES[i]}${optSizeClass(o)}${extra}" disabled>${SHAPES[OPT_CLASSES[i]]}<span>${esc(o)}</span></button>`;
   }).join("");
 }
 function viewReveal(isHost){
