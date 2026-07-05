@@ -16,6 +16,8 @@
     --radius:20px;
   }
   *{box-sizing:border-box;}
+  .audio-toggle{position:fixed; top:14px; right:14px; z-index:50; width:40px; height:40px; border-radius:50%; background:rgba(0,0,0,.35); border:none; color:#fff; font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center; backdrop-filter:blur(4px);}
+  .audio-toggle:hover{background:rgba(0,0,0,.5);}
   html{-webkit-text-size-adjust:100%; text-size-adjust:100%;}
   body{margin:0; position:relative; overflow-x:hidden; background:linear-gradient(135deg,#6D28D9 0%,#8B5CF6 45%,#A855F7 100%); color:var(--text); font-family:Arial,sans-serif; min-height:100vh; min-height:100dvh; display:flex; flex-direction:column; align-items:center; justify-content:flex-start; padding:40px 16px; padding-top:max(40px, env(safe-area-inset-top)); padding-bottom:max(40px, env(safe-area-inset-bottom)); padding-left:max(16px, env(safe-area-inset-left)); padding-right:max(16px, env(safe-area-inset-right));}
   body::before{content:"";position:fixed; top:-220px; right:-160px; width:500px; height:500px; border-radius:50%; background:radial-gradient(circle at 30% 30%, rgba(255,255,255,0.16), transparent 70%); pointer-events:none;}
@@ -342,6 +344,7 @@
 </head>
 <body>
 <div class="brand" id="brand-home" role="button" tabindex="0" aria-label="Về trang chủ"><div class="logo"><img src="logo.jpg" alt="Live!QUIZZ logo" onerror="this.style.display='none'"></div><span class="title" aria-label="Live!QUIZZ"><span class="letter">L</span><span class="letter">i</span><span class="letter">v</span><span class="letter">e</span><span class="letter bang">!</span><span class="letter">Q</span><span class="letter">U</span><span class="letter">I</span><span class="letter">Z</span><span class="letter">Z</span></span></div>
+<button id="audio-toggle" class="audio-toggle" aria-label="Bật/tắt âm thanh" title="Bật/tắt âm thanh">🔊</button>
 <div class="fx-layer" id="fx-layer"></div>
 <div id="app"></div>
 
@@ -368,6 +371,121 @@ function avatarHtml(icon, name){
   if(file) return `<img src="/avt/${file}" alt="">`;
   return esc((icon || name || "?").slice(0,1).toUpperCase());
 }
+
+// Am thanh: hieu ung ngan (sfx) tu tong hop bang Web Audio API, nhac nen (bgm) la file
+// nhac that phat qua the <audio>. Bat/tat qua nut loa, nho trang thai qua localStorage.
+const Sound = (function(){
+  let ctx = null, masterGain = null;
+  let muted = localStorage.getItem("quizMuted") === "1";
+  const bgmFiles = { lobby:"/bgm/lobby-fun-times.mp3", question:"/bgm/question-cool-puzzler.mp3", podium:"/bgm/podium-the-winner.mp3" };
+  const bgmEls = {};
+  let currentBgm = null;
+
+  function ensureCtx(){
+    if(!ctx){
+      ctx = new (window.AudioContext || window.webkitAudioContext)();
+      masterGain = ctx.createGain();
+      masterGain.gain.value = muted ? 0 : 0.5;
+      masterGain.connect(ctx.destination);
+    }
+    if(ctx.state === "suspended") ctx.resume();
+    return ctx;
+  }
+  function ensureBgm(name){
+    if(!bgmEls[name]){
+      const a = new Audio(bgmFiles[name]);
+      a.loop = true;
+      a.volume = muted ? 0 : 0.35;
+      bgmEls[name] = a;
+    }
+    return bgmEls[name];
+  }
+  function tone(freq, start, dur, type, peak){
+    const c = ensureCtx();
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, start);
+    g.gain.setValueAtTime(0.0001, start);
+    g.gain.exponentialRampToValueAtTime(peak, start + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+    o.connect(g); g.connect(masterGain);
+    o.start(start); o.stop(start + dur + 0.02);
+  }
+  function slide(freqFrom, freqTo, start, dur, type, peak){
+    const c = ensureCtx();
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(freqFrom, start);
+    o.frequency.exponentialRampToValueAtTime(freqTo, start + dur);
+    g.gain.setValueAtTime(0.0001, start);
+    g.gain.exponentialRampToValueAtTime(peak, start + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+    o.connect(g); g.connect(masterGain);
+    o.start(start); o.stop(start + dur + 0.02);
+  }
+  function noiseBurst(start, dur, peak, freqCenter){
+    const c = ensureCtx();
+    const buffer = c.createBuffer(1, Math.max(1, Math.floor(c.sampleRate * dur)), c.sampleRate);
+    const data = buffer.getChannelData(0);
+    for(let i=0;i<data.length;i++) data[i] = Math.random()*2-1;
+    const src = c.createBufferSource(); src.buffer = buffer;
+    const bp = c.createBiquadFilter(); bp.type = "bandpass"; bp.frequency.value = freqCenter || 1200; bp.Q.value = 1.1;
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, start);
+    g.gain.exponentialRampToValueAtTime(peak, start + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+    src.connect(bp); bp.connect(g); g.connect(masterGain);
+    src.start(start); src.stop(start + dur + 0.02);
+  }
+  const sfx = {
+    click(){ if(muted) return; const t = ensureCtx().currentTime; tone(1046.5, t, 0.06, "sine", 0.5); },
+    tickUrgent(){ if(muted) return; const t = ensureCtx().currentTime; tone(1318.5, t, 0.11, "square", 0.28); },
+    timeUp(){ if(muted) return; const t = ensureCtx().currentTime; slide(420, 90, t, 0.55, "sawtooth", 0.35); },
+    correct(){ if(muted) return; const t = ensureCtx().currentTime; [523.25,659.25,783.99,1046.5].forEach((f,i)=> tone(f, t+i*0.09, 0.28, "triangle", 0.32)); },
+    wrong(){ if(muted) return; const t = ensureCtx().currentTime; tone(196, t, 0.22, "sawtooth", 0.3); tone(146.83, t+0.16, 0.32, "sawtooth", 0.3); },
+    drumroll(){
+      if(muted) return; const t = ensureCtx().currentTime;
+      let time = t; const totalDur = 1.1; let interval = 0.09;
+      while(time < t + totalDur){ noiseBurst(time, 0.05, 0.22, 1500); time += interval; interval *= 0.92; }
+      tone(220, t + totalDur, 0.3, "sawtooth", 0.4);
+    },
+    leaderboardStinger(){ if(muted) return; const t = ensureCtx().currentTime; slide(300, 1200, t, 0.4, "sine", 0.3); tone(1568, t+0.32, 0.25, "triangle", 0.25); },
+    fanfare(){
+      if(muted) return; const t = ensureCtx().currentTime;
+      const chords = [[523.25,659.25,783.99],[587.33,739.99,880.0],[659.25,830.61,987.77],[783.99,987.77,1174.66]];
+      chords.forEach((chord,i)=>{ const start = t + i*0.22; chord.forEach(f=> tone(f, start, 0.5, "sawtooth", 0.14)); });
+    },
+    confettiPop(){ if(muted) return; const t = ensureCtx().currentTime; noiseBurst(t, 0.05, 0.25, 2200); tone(1800, t, 0.08, "sine", 0.2); },
+  };
+  function playBgm(name){
+    if(currentBgm === name) return;
+    Object.keys(bgmEls).forEach(k=>{ if(k!==name) bgmEls[k].pause(); });
+    currentBgm = name;
+    if(!name || muted) return;
+    ensureBgm(name).play().catch(()=>{});
+  }
+  function stopBgm(){
+    if(currentBgm && bgmEls[currentBgm]) bgmEls[currentBgm].pause();
+    currentBgm = null;
+  }
+  function setMuted(v){
+    muted = v;
+    localStorage.setItem("quizMuted", v ? "1" : "0");
+    if(masterGain) masterGain.gain.value = v ? 0 : 0.5;
+    Object.values(bgmEls).forEach(a=> a.volume = v ? 0 : 0.35);
+    if(v) Object.values(bgmEls).forEach(a=> a.pause());
+    else if(currentBgm) ensureBgm(currentBgm).play().catch(()=>{});
+  }
+  function toggleMuted(){ setMuted(!muted); return muted; }
+  function unlock(){
+    ensureCtx();
+    if(!muted && currentBgm) ensureBgm(currentBgm).play().catch(()=>{});
+  }
+  return { sfx, playBgm, stopBgm, toggleMuted, isMuted:()=>muted, unlock };
+})();
+document.addEventListener("pointerdown", function unlockAudioOnce(){
+  Sound.unlock();
+  document.removeEventListener("pointerdown", unlockAudioOnce);
+}, { once:true });
 
 const urlParams = new URLSearchParams(location.search);
 const joinCodeFromUrl = urlParams.get("join");
@@ -425,6 +543,16 @@ function render(){
   document.body.classList.toggle("lobby-stage", state.screen==="host_lobby");
   if((state.screen==="host_results" && state.resultsStage==="leaderboard") || state.screen==="host_ended") startCelebration();
   else clearFx();
+  updateBgmForScreen();
+}
+// Nhac nen: sanh cho / cau hoi / trao giai co nhac loop rieng, cac man con lai (reveal, bang
+// xep hang, ket qua cuoi) dung sfx ngan (drumroll, stinger, fanfare) thay vi nhac nen lien tuc.
+function updateBgmForScreen(){
+  const s = state.screen;
+  if(s==="host_lobby" || s==="player_wait") Sound.playBgm("lobby");
+  else if(s==="host_question" || s==="player_question") Sound.playBgm("question");
+  else if(s==="host_podium") Sound.playBgm("podium");
+  else Sound.stopBgm();
 }
 
 function renderQr(){
@@ -667,9 +795,11 @@ function revealPodiumRank(rank, player, isTop1){
   const row = el("podium-row");
   if(!row || !player) return Promise.resolve();
   row.insertAdjacentHTML("beforeend", podiumSlotHtml(rank, player));
+  Sound.sfx.confettiPop();
   if(isTop1){
     const layer = el("fx-layer");
     if(layer){ spawnConfettiBurst(layer, 50); spawnFirework(layer); }
+    Sound.sfx.fanfare();
   }
   return new Promise(resolve=> setTimeout(resolve, 950));
 }
@@ -857,7 +987,7 @@ function runLeaderboardReveal(containerId, prevList, newList, isFirst){
 }
 
 function bind(){
-  const b=(id,fn)=>{ const n=el(id); if(n) n.onclick=fn; };
+  const b=(id,fn)=>{ const n=el(id); if(n) n.onclick=()=>{ Sound.sfx.click(); fn(); }; };
   b("pick-host", ()=>{ state.screen="host_setup"; render(); loadQuestionSets(); });
   b("pick-player", ()=>{ state.screen="player_join"; render(); });
   b("pick-history", ()=>{ location.href="/history.html"; });
@@ -871,8 +1001,17 @@ function bind(){
     brandEl.onclick = ()=>{ location.href = location.pathname; };
     brandEl.onkeydown = (e)=>{ if(e.key==="Enter" || e.key===" "){ e.preventDefault(); location.href = location.pathname; } };
   }
+  const audioToggleEl = el("audio-toggle");
+  if(audioToggleEl){
+    audioToggleEl.textContent = Sound.isMuted() ? "🔇" : "🔊";
+    audioToggleEl.onclick = ()=>{
+      const muted = Sound.toggleMuted();
+      audioToggleEl.textContent = muted ? "🔇" : "🔊";
+    };
+  }
   document.querySelectorAll(".icon-opt").forEach(node=>{
     node.onclick=()=>{
+      Sound.sfx.click();
       state.selectedIcon = node.dataset.icon;
       document.querySelectorAll(".icon-opt").forEach(n=>n.classList.toggle("active", n===node));
     };
@@ -907,6 +1046,7 @@ function bind(){
   document.querySelectorAll(".opt[data-choice]").forEach(btn=>{
     btn.onclick=()=>{
       if(state.role!=="player" || state.answered) return;
+      Sound.sfx.click();
       state.answered=true;
       state.chosenIndex = parseInt(btn.dataset.choice);
       document.querySelectorAll(".opt[data-choice]").forEach(x=>x.disabled=true);
@@ -918,6 +1058,7 @@ function bind(){
 
 function startTimerLoop(){
   if(tickHandle) clearInterval(tickHandle);
+  let lastSec = null;
   tickHandle = setInterval(()=>{
     const remaining = currentStart + currentDuration - Date.now();
     const numEl = el("timer-num"), ring = el("ring");
@@ -927,7 +1068,15 @@ function startTimerLoop(){
       const frac = Math.max(0, Math.min(1, remaining/currentDuration));
       ring.setAttribute("stroke-dashoffset", String(176*(1-frac)));
     }
-    if(remaining<=0) clearInterval(tickHandle);
+    // Chi tick gap (5s cuoi) de tranh lam phien nhac nen suot ca cau hoi.
+    if(secs !== lastSec){
+      lastSec = secs;
+      if(secs > 0 && secs <= 5) Sound.sfx.tickUrgent();
+    }
+    if(remaining<=0){
+      clearInterval(tickHandle);
+      Sound.sfx.timeUp();
+    }
   }, 250);
 }
 
@@ -952,9 +1101,13 @@ function applyQuestionData(data){
 function enterResultsStage(){
   state.resultsStage = "reveal";
   clearTimeout(revealTimer);
+  if(state.role==="host") Sound.sfx.drumroll();
+  else if(state.lastCorrect===true) Sound.sfx.correct();
+  else if(state.lastCorrect===false) Sound.sfx.wrong();
   if(!state.explanation){
     revealTimer = setTimeout(()=>{
       state.resultsStage = "leaderboard";
+      Sound.sfx.leaderboardStinger();
       render();
     }, 2200);
   }
@@ -1043,6 +1196,7 @@ socket.on("results:show", ()=>{
   clearTimeout(revealTimer);
   if(state.screen==="host_results" || state.screen==="player_results"){
     state.resultsStage = "leaderboard";
+    Sound.sfx.leaderboardStinger();
     render();
   }
 });

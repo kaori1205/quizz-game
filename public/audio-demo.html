@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Audio Demo - Live!Quizz</title>
+<style>
+  body{font-family:Arial,sans-serif; background:#1b1230; color:#fff; padding:24px; max-width:720px; margin:0 auto;}
+  h1{font-size:22px;}
+  h2{font-size:16px; color:#c9b8ff; margin-top:32px; border-bottom:1px solid #3a2a66; padding-bottom:6px;}
+  .row{display:flex; align-items:center; gap:12px; padding:8px 0; flex-wrap:wrap;}
+  .row .name{width:230px; font-weight:600;}
+  .row .desc{flex:1; min-width:180px; font-size:13px; color:#b8a9dd;}
+  button{background:#8B5CF6; color:#fff; border:none; border-radius:8px; padding:8px 16px; font-weight:700; cursor:pointer; font-size:14px;}
+  button:hover{background:#7c3aed;}
+  button.stop{background:#e0435c;}
+  .vol{display:flex; align-items:center; gap:8px; margin:16px 0;}
+</style>
+</head>
+<body>
+<h1>🔊 Demo hiệu ứng âm thanh (chưa gắn vào game)</h1>
+<p style="color:#b8a9dd">Bấm từng nút để nghe thử. Tất cả tạo trực tiếp bằng Web Audio API, không cần file tải về.</p>
+<div class="vol">
+  <label>Âm lượng tổng</label>
+  <input type="range" id="master-vol" min="0" max="1" step="0.01" value="0.5">
+</div>
+
+<h2>Tương tác chung (UI)</h2>
+<div class="row"><div class="name">Click / chọn đáp án</div><div class="desc">Tíc ngắn khi bấm nút, chọn đáp án</div><button data-fn="playClick">▶ Nghe</button></div>
+
+<h2>Câu hỏi &amp; đếm giờ</h2>
+<div class="row"><div class="name">Tick đếm giờ (bình thường)</div><div class="desc">Mỗi giây khi còn nhiều thời gian</div><button data-fn="playTickNormal">▶ Nghe</button></div>
+<div class="row"><div class="name">Tick đếm giờ (gấp - 5s cuối)</div><div class="desc">Tông cao hơn, dồn dập hơn khi sắp hết giờ</div><button data-fn="playTickUrgent">▶ Nghe</button></div>
+<div class="row"><div class="name">Hết giờ / khoá đáp án</div><div class="desc">Buzz báo hết giờ trả lời</div><button data-fn="playTimeUp">▶ Nghe</button></div>
+
+<h2>Kết quả câu trả lời</h2>
+<div class="row"><div class="name">Trả lời đúng</div><div class="desc">Chuông vui tươi, đi lên</div><button data-fn="playCorrect">▶ Nghe</button></div>
+<div class="row"><div class="name">Trả lời sai</div><div class="desc">Buzz trầm, đi xuống</div><button data-fn="playWrong">▶ Nghe</button></div>
+<div class="row"><div class="name">Trống dồn trước khi lộ đáp án</div><div class="desc">Drumroll hồi hộp trước reveal</div><button data-fn="playDrumroll">▶ Nghe</button></div>
+
+<h2>Bảng xếp hạng &amp; Trao giải</h2>
+<div class="row"><div class="name">Bảng xếp hạng xuất hiện</div><div class="desc">Tiếng "swoosh" đi lên khi bảng xếp hạng hiện ra</div><button data-fn="playLeaderboardStinger">▶ Nghe</button></div>
+<div class="row"><div class="name">Fanfare trao giải (bục vinh danh)</div><div class="desc">Chuỗi hợp âm chiến thắng ngắn</div><button data-fn="playFanfare">▶ Nghe</button></div>
+<div class="row"><div class="name">Confetti pop</div><div class="desc">Tiếng "pop" nhẹ khi pháo giấy bắn ra</div><button data-fn="playConfettiPop">▶ Nghe</button></div>
+
+<h2>Nhạc nền (nguồn: soundimage.org, free — cần ghi credit)</h2>
+<div class="row"><div class="name">Nhạc chờ sảnh (lobby)</div><div class="desc">Fun Times — vui tươi, nhẹ nhàng</div></div>
+<audio controls loop src="/bgm/lobby-fun-times.mp3" style="width:100%; margin-bottom:14px;"></audio>
+<div class="row"><div class="name">Nhạc nền câu hỏi</div><div class="desc">Cool Puzzler (LoFi) — nhịp nhẹ, tò mò</div></div>
+<audio controls loop src="/bgm/question-cool-puzzler.mp3" style="width:100%; margin-bottom:14px;"></audio>
+<div class="row"><div class="name">Nhạc trao giải / bục vinh danh</div><div class="desc">The Winner — cảm giác chiến thắng</div></div>
+<audio controls loop src="/bgm/podium-the-winner.mp3" style="width:100%; margin-bottom:14px;"></audio>
+
+<script>
+const AC = window.AudioContext || window.webkitAudioContext;
+const ctx = new AC();
+let masterGain = ctx.createGain();
+masterGain.gain.value = 0.5;
+masterGain.connect(ctx.destination);
+document.getElementById('master-vol').addEventListener('input', e=>{
+  masterGain.gain.value = parseFloat(e.target.value);
+});
+
+function tone(freq, start, dur, type, peak, destGain){
+  const o = ctx.createOscillator();
+  const g = ctx.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, start);
+  g.gain.setValueAtTime(0.0001, start);
+  g.gain.exponentialRampToValueAtTime(peak, start + 0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+  o.connect(g); g.connect(destGain || masterGain);
+  o.start(start); o.stop(start + dur + 0.02);
+  return o;
+}
+function slide(freqFrom, freqTo, start, dur, type, peak){
+  const o = ctx.createOscillator();
+  const g = ctx.createGain();
+  o.type = type;
+  o.frequency.setValueAtTime(freqFrom, start);
+  o.frequency.exponentialRampToValueAtTime(freqTo, start + dur);
+  g.gain.setValueAtTime(0.0001, start);
+  g.gain.exponentialRampToValueAtTime(peak, start + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+  o.connect(g); g.connect(masterGain);
+  o.start(start); o.stop(start + dur + 0.02);
+}
+function noiseBurst(start, dur, peak, freqCenter){
+  const bufferSize = ctx.sampleRate * dur;
+  const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for(let i=0;i<bufferSize;i++) data[i] = Math.random()*2-1;
+  const src = ctx.createBufferSource();
+  src.buffer = buffer;
+  const bp = ctx.createBiquadFilter();
+  bp.type = "bandpass"; bp.frequency.value = freqCenter || 1200; bp.Q.value = 1.1;
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.0001, start);
+  g.gain.exponentialRampToValueAtTime(peak, start + 0.008);
+  g.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+  src.connect(bp); bp.connect(g); g.connect(masterGain);
+  src.start(start); src.stop(start + dur + 0.02);
+}
+
+function playClick(){
+  const t = ctx.currentTime;
+  tone(1046.5, t, 0.06, "sine", 0.5);
+}
+function playTickNormal(){
+  const t = ctx.currentTime;
+  tone(880, t, 0.09, "square", 0.18);
+}
+function playTickUrgent(){
+  const t = ctx.currentTime;
+  tone(1318.5, t, 0.11, "square", 0.28);
+}
+function playTimeUp(){
+  const t = ctx.currentTime;
+  slide(420, 90, t, 0.55, "sawtooth", 0.35);
+}
+function playCorrect(){
+  const t = ctx.currentTime;
+  [523.25, 659.25, 783.99, 1046.5].forEach((f,i)=> tone(f, t + i*0.09, 0.28, "triangle", 0.32));
+}
+function playWrong(){
+  const t = ctx.currentTime;
+  tone(196, t, 0.22, "sawtooth", 0.3);
+  tone(146.83, t + 0.16, 0.32, "sawtooth", 0.3);
+}
+function playDrumroll(){
+  const t = ctx.currentTime;
+  let time = t;
+  const totalDur = 1.1;
+  let interval = 0.09;
+  while(time < t + totalDur){
+    noiseBurst(time, 0.05, 0.22, 1500);
+    time += interval;
+    interval *= 0.92;
+  }
+  tone(220, t + totalDur, 0.3, "sawtooth", 0.4);
+}
+function playLeaderboardStinger(){
+  const t = ctx.currentTime;
+  slide(300, 1200, t, 0.4, "sine", 0.3);
+  tone(1568, t + 0.32, 0.25, "triangle", 0.25);
+}
+function playFanfare(){
+  const t = ctx.currentTime;
+  const chords = [
+    [523.25, 659.25, 783.99],
+    [587.33, 739.99, 880.0],
+    [659.25, 830.61, 987.77],
+    [783.99, 987.77, 1174.66]
+  ];
+  chords.forEach((chord, i)=>{
+    const start = t + i*0.22;
+    chord.forEach(f=> tone(f, start, 0.5, "sawtooth", 0.14));
+  });
+}
+function playConfettiPop(){
+  const t = ctx.currentTime;
+  noiseBurst(t, 0.05, 0.25, 2200);
+  tone(1800, t, 0.08, "sine", 0.2);
+}
+
+document.querySelectorAll('button[data-fn]').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    if(ctx.state === 'suspended') ctx.resume();
+    window[btn.dataset.fn]();
+  });
+});
+</script>
+</body>
+</html>
