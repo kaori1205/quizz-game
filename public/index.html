@@ -110,7 +110,8 @@
   .opt:not(:disabled):active{transform:translateY(4px); box-shadow:none !important;}
   .opt:disabled:not(.selected){opacity:.45; cursor:default; box-shadow:none;}
   .opt.selected:disabled{opacity:1; cursor:default; transform:translateY(-4px);}
-  .opt.reveal-correct{opacity:1 !important; cursor:default; background:#22C55E !important; box-shadow:0 6px 0 0 #16803C !important; transform:translateY(-4px);}
+  .opt.reveal-correct{opacity:1 !important; cursor:default; transform:translateY(-4px);}
+  .opt.reveal-correct-color{background:#22C55E !important; box-shadow:0 6px 0 0 #16803C !important;}
   .opt.reveal-wrong{opacity:1 !important; cursor:default; background:#EF4444 !important; box-shadow:0 6px 0 0 #B91C1C !important;}
   .opt-logo{width:28px; height:28px; border-radius:9px; background:#fff; display:flex; align-items:center; justify-content:center; flex-shrink:0; box-shadow:0 2px 6px rgba(0,0,0,.18);}
   .opt-logo span{font-family:'Luckiest Guy',cursive; font-weight:400; font-size:16px; line-height:1; display:block;}
@@ -718,11 +719,13 @@ function optSizeClass(options){
   if(maxLen > 45) return " opt-md";
   return "";
 }
-function renderRevealOptions(){
+function renderRevealOptions(isHost){
   const sizeClass = optSizeClass(state.options);
   return state.options.map((o,i)=>{
     let extra = "";
-    if(i===state.correctIndex) extra = " reveal-correct";
+    // Ben host: dap an dung giu nguyen mau o goc (cac o sai da mo di la du phan biet roi),
+    // khong can chuyen sang xanh la nua. Ben nguoi choi van giu mau xanh la nhu cu.
+    if(i===state.correctIndex) extra = " reveal-correct" + (isHost ? "" : " reveal-correct-color");
     else if(state.chosenIndex!=null && i===state.chosenIndex) extra = " reveal-wrong";
     return `<button class="opt ${OPT_CLASSES[i]}${sizeClass}${extra}" disabled>${SHAPES[OPT_CLASSES[i]]}<span>${esc(o)}</span></button>`;
   }).join("");
@@ -745,7 +748,7 @@ function viewReveal(isHost){
   </div>
   ${banner}
   <div class="qa-question"><div class="question-box${isExplain?" explain-box":""}">${explainTag}<div class="question-text">${esc(boxText)}</div></div></div>
-  <div class="qa-answers"><div class="opts">${renderRevealOptions()}</div></div>
+  <div class="qa-answers"><div class="opts">${renderRevealOptions(isHost)}</div></div>
   <div class="qa-footer">
   <div class="divider"></div>
   ${footer}
