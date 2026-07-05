@@ -30,7 +30,10 @@
 <h2>Câu hỏi &amp; đếm giờ</h2>
 <div class="row"><div class="name">Tick đếm giờ (bình thường)</div><div class="desc">Mỗi giây khi còn nhiều thời gian</div><button data-fn="playTickNormal">▶ Nghe</button></div>
 <div class="row"><div class="name">Tick đếm giờ (gấp - 5s cuối)</div><div class="desc">Tông cao hơn, dồn dập hơn khi sắp hết giờ</div><button data-fn="playTickUrgent">▶ Nghe</button></div>
-<div class="row"><div class="name">Hết giờ / khoá đáp án</div><div class="desc">Buzz báo hết giờ trả lời</div><button data-fn="playTimeUp">▶ Nghe</button></div>
+<div class="row"><div class="name">Hết giờ (bản ĐANG DÙNG)</div><div class="desc">Buzz trượt xuống — bạn thấy chưa đặc sắc</div><button data-fn="playTimeUp">▶ Nghe</button></div>
+<div class="row"><div class="name">Hết giờ — phương án A</div><div class="desc">Buzzer game show cổ điển, 2 tông chói nghịch âm kéo dài</div><button data-fn="playTimeUpA">▶ Nghe</button></div>
+<div class="row"><div class="name">Hết giờ — phương án B</div><div class="desc">Còi báo 3 tiếng "tút-tút-tuuút" kiểu còi tàu/khói báo hết giờ</div><button data-fn="playTimeUpB">▶ Nghe</button></div>
+<div class="row"><div class="name">Hết giờ — phương án C</div><div class="desc">"Ding" chuông ngắn rồi buzz trầm ngay sau, dứt khoát</div><button data-fn="playTimeUpC">▶ Nghe</button></div>
 
 <h2>Kết quả câu trả lời</h2>
 <div class="row"><div class="name">Trả lời đúng</div><div class="desc">Chuông vui tươi, đi lên</div><button data-fn="playCorrect">▶ Nghe</button></div>
@@ -42,13 +45,13 @@
 <div class="row"><div class="name">Fanfare trao giải (bục vinh danh)</div><div class="desc">Chuỗi hợp âm chiến thắng ngắn</div><button data-fn="playFanfare">▶ Nghe</button></div>
 <div class="row"><div class="name">Confetti pop</div><div class="desc">Tiếng "pop" nhẹ khi pháo giấy bắn ra</div><button data-fn="playConfettiPop">▶ Nghe</button></div>
 
-<h2>Nhạc nền (nguồn: soundimage.org, free — cần ghi credit)</h2>
-<div class="row"><div class="name">Nhạc chờ sảnh (lobby)</div><div class="desc">Fun Times — vui tươi, nhẹ nhàng</div></div>
-<audio controls loop src="/bgm/lobby-fun-times.mp3" style="width:100%; margin-bottom:14px;"></audio>
-<div class="row"><div class="name">Nhạc nền câu hỏi</div><div class="desc">Cool Puzzler (LoFi) — nhịp nhẹ, tò mò</div></div>
-<audio controls loop src="/bgm/question-cool-puzzler.mp3" style="width:100%; margin-bottom:14px;"></audio>
-<div class="row"><div class="name">Nhạc trao giải / bục vinh danh</div><div class="desc">The Winner — cảm giác chiến thắng</div></div>
-<audio controls loop src="/bgm/podium-the-winner.mp3" style="width:100%; margin-bottom:14px;"></audio>
+<h2>Nhạc nền (đang dùng trong game)</h2>
+<div class="row"><div class="name">Nhạc chờ sảnh (lobby)</div><div class="desc">Extreme Sports Mayhem — hype, dồn dập</div></div>
+<audio controls loop src="/bgm/lobby-extreme-sports-mayhem.mp3" style="width:100%; margin-bottom:14px;"></audio>
+<div class="row"><div class="name">Nhạc nền câu hỏi</div><div class="desc">Techno Gameplay — điện tử dồn dập, kịch tính</div></div>
+<audio controls loop src="/bgm/question-techno-gameplay.mp3" style="width:100%; margin-bottom:14px;"></audio>
+<div class="row"><div class="name">Nhạc trao giải / bục vinh danh</div><div class="desc">Techno Celebration — bùng nổ, cao trào</div></div>
+<audio controls loop src="/bgm/podium-techno-celebration.mp3" style="width:100%; margin-bottom:14px;"></audio>
 
 <script>
 const AC = window.AudioContext || window.webkitAudioContext;
@@ -115,6 +118,33 @@ function playTickUrgent(){
 function playTimeUp(){
   const t = ctx.currentTime;
   slide(420, 90, t, 0.55, "sawtooth", 0.35);
+}
+function playTimeUpA(){
+  // Buzzer game show: 2 dao dong sawtooth lech tong nhe (150/154Hz) tao tieng "EHHH" choi tai, giu deu roi cat dut.
+  const t = ctx.currentTime;
+  [150, 154].forEach(f=>{
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = "sawtooth"; o.frequency.setValueAtTime(f, t);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.3, t + 0.02);
+    g.gain.setValueAtTime(0.3, t + 0.45);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.6);
+    o.connect(g); g.connect(masterGain);
+    o.start(t); o.stop(t + 0.62);
+  });
+}
+function playTimeUpB(){
+  // Coi bao 3 tieng "tut-tut-tuuut": 2 tieng ngan cung tong, tieng thu 3 dai hon va thap hon.
+  const t = ctx.currentTime;
+  tone(392, t, 0.13, "square", 0.32);
+  tone(392, t + 0.18, 0.13, "square", 0.32);
+  tone(293.66, t + 0.36, 0.4, "square", 0.34);
+}
+function playTimeUpC(){
+  // "Ding" chuong ngan (the hien viec khoa dap an) roi buzz tram ngay sau, dut khoat.
+  const t = ctx.currentTime;
+  tone(1568, t, 0.16, "sine", 0.35);
+  tone(160, t + 0.14, 0.45, "sawtooth", 0.32);
 }
 function playCorrect(){
   const t = ctx.currentTime;

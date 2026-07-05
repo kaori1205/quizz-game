@@ -377,7 +377,7 @@ function avatarHtml(icon, name){
 const Sound = (function(){
   let ctx = null, masterGain = null;
   let muted = localStorage.getItem("quizMuted") === "1";
-  const bgmFiles = { lobby:"/bgm/lobby-fun-times.mp3", question:"/bgm/question-cool-puzzler.mp3", podium:"/bgm/podium-the-winner.mp3" };
+  const bgmFiles = { lobby:"/bgm/lobby-extreme-sports-mayhem.mp3", question:"/bgm/question-techno-gameplay.mp3", podium:"/bgm/podium-techno-celebration.mp3" };
   const bgmEls = {};
   let currentBgm = null;
 
@@ -439,7 +439,14 @@ const Sound = (function(){
   const sfx = {
     click(){ if(muted) return; const t = ensureCtx().currentTime; tone(1046.5, t, 0.06, "sine", 0.5); },
     tickUrgent(){ if(muted) return; const t = ensureCtx().currentTime; tone(1318.5, t, 0.11, "square", 0.28); },
-    timeUp(){ if(muted) return; const t = ensureCtx().currentTime; slide(420, 90, t, 0.55, "sawtooth", 0.35); },
+    // Coi bao 3 tieng "tut-tut-tuuut": 2 tieng ngan cung tong, tieng thu 3 dai hon va thap hon.
+    timeUp(){
+      if(muted) return;
+      const t = ensureCtx().currentTime;
+      tone(392, t, 0.13, "square", 0.32);
+      tone(392, t + 0.18, 0.13, "square", 0.32);
+      tone(293.66, t + 0.36, 0.4, "square", 0.34);
+    },
     correct(){ if(muted) return; const t = ensureCtx().currentTime; [523.25,659.25,783.99,1046.5].forEach((f,i)=> tone(f, t+i*0.09, 0.28, "triangle", 0.32)); },
     wrong(){ if(muted) return; const t = ensureCtx().currentTime; tone(196, t, 0.22, "sawtooth", 0.3); tone(146.83, t+0.16, 0.32, "sawtooth", 0.3); },
     drumroll(){
@@ -1101,9 +1108,12 @@ function applyQuestionData(data){
 function enterResultsStage(){
   state.resultsStage = "reveal";
   clearTimeout(revealTimer);
-  if(state.role==="host") Sound.sfx.drumroll();
-  else if(state.lastCorrect===true) Sound.sfx.correct();
-  else if(state.lastCorrect===false) Sound.sfx.wrong();
+  // Bo drumroll: dap an hien ra ngay lap tuc (khong co do tre hoi hop), nen tieng trong
+  // don keo dai ~1.1s bi lech nhip, nghe nhu cham so voi hinh anh.
+  if(state.role!=="host"){
+    if(state.lastCorrect===true) Sound.sfx.correct();
+    else if(state.lastCorrect===false) Sound.sfx.wrong();
+  }
   if(!state.explanation){
     revealTimer = setTimeout(()=>{
       state.resultsStage = "leaderboard";
@@ -1180,6 +1190,9 @@ socket.on("answer:count", ({answered,total})=>{
 });
 
 socket.on("game:results", ({leaderboard, previousLeaderboard, isFirstQuestion, correctIndex, correctText, explanation})=>{
+  // Cau hoi ket thuc som (host force-end) truoc khi het gio: phai huy tickHandle ngay,
+  // neu khong no van chay ngam va phat tick/timeUp tre vao dung luc dang o man reveal/xep hang.
+  if(tickHandle) clearInterval(tickHandle);
   state.prevRankMap = buildRankMap(state.leaderboard);
   state.leaderboard = leaderboard;
   state.previousLeaderboard = previousLeaderboard;
@@ -1202,6 +1215,7 @@ socket.on("results:show", ()=>{
 });
 
 socket.on("game:ended", ({leaderboard, gameId})=>{
+  if(tickHandle) clearInterval(tickHandle);
   state.prevRankMap = buildRankMap(state.leaderboard);
   state.leaderboard = leaderboard;
   state.gameId = gameId;
