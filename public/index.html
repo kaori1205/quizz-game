@@ -133,9 +133,15 @@
   .qa-question{flex:3 1 0%; display:flex; align-items:stretch; justify-content:center;}
   .question-box{width:100%; height:calc(100% - 20px); margin-bottom:20px; display:flex; align-items:center; justify-content:center; background:rgba(58,45,120,.16); backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px); border:1px solid rgba(255,255,255,.4); border-radius:18px; padding:22px 24px; box-shadow:0 8px 22px rgba(20,10,50,.10), inset 0 1px 0 rgba(255,255,255,.3);}
   .question-box .question-text{width:100%; margin:0; color:#1A1333; text-align:center;}
-  .question-box.explain-box{flex-direction:column; background:var(--primary); border-color:rgba(255,255,255,.35); box-shadow:0 8px 22px rgba(80,40,160,.35), inset 0 1px 0 rgba(255,255,255,.25);}
+  .question-box.explain-box{flex-direction:column; background:var(--primary); border-color:rgba(255,255,255,.35); box-shadow:0 0 0 6px rgba(139,92,246,.25), 0 8px 22px rgba(80,40,160,.4), inset 0 1px 0 rgba(255,255,255,.25); animation:explainPop .55s cubic-bezier(.34,1.4,.64,1) both;}
   .question-box.explain-box .question-text{color:#fff;}
-  .explain-tag{display:inline-block; background:rgba(255,255,255,.22); color:#fff; font-weight:700; font-size:13px; letter-spacing:.3px; padding:5px 14px; border-radius:999px; margin-bottom:12px; text-transform:uppercase; flex-shrink:0;}
+  @keyframes explainPop{
+    0%{transform:scale(.9); box-shadow:0 0 0 0 rgba(139,92,246,.7), 0 8px 22px rgba(80,40,160,.4), inset 0 1px 0 rgba(255,255,255,.25);}
+    55%{transform:scale(1.035);}
+    100%{transform:scale(1); box-shadow:0 0 0 6px rgba(139,92,246,.25), 0 8px 22px rgba(80,40,160,.4), inset 0 1px 0 rgba(255,255,255,.25);}
+  }
+  .explain-tag{font-family:Arial,sans-serif !important; display:inline-flex; align-items:center; gap:6px; background:#fff; color:#052699; font-weight:800; font-size:14px; letter-spacing:.3px; padding:7px 18px; border-radius:999px; margin-bottom:14px; text-transform:uppercase; flex-shrink:0; box-shadow:0 4px 10px rgba(0,0,0,.25); animation:explainTagPulse 1.6s ease-in-out .55s 2;}
+  @keyframes explainTagPulse{0%,100%{transform:scale(1);} 50%{transform:scale(1.08);}}
   .qa-answers{flex:2 1 0%; display:flex; align-items:stretch;}
   .qa-answers .opts{width:100%; height:100%; grid-template-rows:1fr 1fr;}
   .qa-answers .opts .opt{height:100%; min-height:0;}
@@ -165,7 +171,7 @@
   .podium-slot.rank1{order:2;}
   .podium-slot.rank3{order:3;}
   .podium-slot .avatar{width:clamp(52px,11.5vw,80px); height:clamp(52px,11.5vw,80px); font-size:clamp(20px,4.4vw,30px); margin-bottom:8px; box-shadow:0 4px 12px rgba(0,0,0,.25); border:3px solid #fff;}
-  .podium-slot .p-name{font-weight:800; font-size:clamp(15px,3.6vw,20px); color:var(--text); text-align:center; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .podium-slot .p-name{font-family:Arial,sans-serif !important; font-weight:700; font-size:clamp(15px,3.6vw,20px); color:var(--text); text-align:center; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
   .podium-slot .p-score{font-family:Arial,sans-serif; font-weight:800; color:var(--gold); font-size:clamp(16px,3.8vw,22px); margin-bottom:8px;}
   .podium-block{width:100%; border-radius:10px 10px 0 0; display:flex; align-items:flex-start; justify-content:center; padding-top:8px; font-family:'Luckiest Guy',cursive; font-weight:400; color:#fff; text-shadow:0 2px 4px rgba(0,0,0,.3);}
   .podium-slot.rank1 .podium-block{height:clamp(80px,16vh,140px); background:linear-gradient(180deg,#FFE38A,var(--gold)); font-size:clamp(24px,5.4vw,34px); box-shadow:0 -4px 18px rgba(255,201,60,.4);}
@@ -224,6 +230,8 @@
   @media (max-width:600px){
     .opts{grid-template-columns:1fr; gap:10px;}
     .qa-answers .opts{grid-template-rows:repeat(4,1fr);}
+    /* Da xep 1 cot (du rong de doc) nen khong can thu nho chu nua, tra ve kich thuoc goc */
+    .opt.opt-md, .opt.opt-sm, .opt.opt-xs{font-size:16px; padding:18px 16px; gap:10px; line-height:1.25;}
   }
 
   /* ===== Responsive: small phones ===== */
@@ -814,17 +822,18 @@ function runLeaderboardReveal(containerId, prevList, newList, isFirst){
         }
       });
 
+      // Dung Web Animations API (thay vi tu bat/tat CSS transition) de dam bao animation
+      // luon chay muot on dinh, khong bi phu thuoc vao thoi diem reflow/paint cua trinh duyet.
       Array.from(container.children).forEach(r=>{
         const first = firstRects[r.dataset.cid];
         if(!first) return;
         const last = r.getBoundingClientRect();
         const dy = first.top - last.top;
         if(Math.abs(dy) > 1){
-          r.style.transition = "none";
-          r.style.transform = `translateY(${dy}px)`;
-          r.offsetHeight; // ep trinh duyet "chot" vi tri cu truoc khi bat lai transition, tranh bi "pop" thang
-          r.style.transition = "transform .9s cubic-bezier(.34,1.2,.64,1)";
-          r.style.transform = "";
+          r.animate(
+            [{ transform: `translateY(${dy}px)` }, { transform: "translateY(0)" }],
+            { duration: 900, easing: "cubic-bezier(.34,1.2,.64,1)", fill: "backwards" }
+          );
         }
       });
     }, 1400);
