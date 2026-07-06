@@ -11,6 +11,9 @@ const io = new Server(server);
 
 const PORT = process.env.PORT || 3000;
 const QUESTION_DURATION = 20000; // 20 giây mỗi câu
+// Neu socket cua HOST bi rot (mat mang tam thoi, tab bi treo do tai cao...), cho phep
+// ho thoi gian nay de tu ket noi lai truoc khi phong bi xoa va tat ca nguoi choi bi da ra.
+const HOST_DISCONNECT_GRACE_MS = 20000;
 
 // Danh sách icon avatar hợp lệ (ứng với ảnh trong public/avt) — dùng để kiểm tra
 // icon người chơi gửi lên có hợp lệ không, tránh nhận icon tuỳ ý không xác định.
@@ -201,6 +204,7 @@ io.on("connection", (socket) => {
       }
     }
 
+    const hostToken = genClientId();
     rooms[code] = {
       questions,
       currentIndex: -1,
@@ -208,6 +212,8 @@ io.on("connection", (socket) => {
       phaseStartTime: 0,
       duration,
       hostSocketId: socket.id,
+      hostToken,
+      hostDisconnectTimer: null,
       players: {},
       answers: {},
       socketToClient: {},
@@ -215,7 +221,23 @@ io.on("connection", (socket) => {
     socket.join(code);
     socket.data.role = "host";
     socket.data.roomCode = code;
-    cb({ ok: true, code, totalQuestions: questions.length });
+    cb({ ok: true, code, totalQuestions: questions.length, hostToken });
+  });
+
+  // ---- HOST: tu ket noi lai dung phong cu sau khi socket bi rot tam thoi (con trong
+  // thoi gian an han), thay vi bi coi la roi phong va bi xoa phong. ----
+  socket.on("host:rejoin", ({ code, hostToken } = {}, cb) => {
+    const room = rooms[code];
+    if (!room || !hostToken || room.hostToken !== hostToken) {
+      return cb({ ok: false, error: "Không thể kết nối lại phòng cũ." });
+    }
+    clearTimeout(room.hostDisconnectTimer);
+    room.hostDisconnectTimer = null;
+    room.hostSocketId = socket.id;
+    socket.join(code);
+    socket.data.role = "host";
+    socket.data.roomCode = code;
+    cb({ ok: true, totalQuestions: room.questions.length, resume: buildResumePayload(room, null) });
   });
 
   // ---- PLAYER: tham gia phòng (hoặc rejoin sau khi mất kết nối tạm thời) ----
@@ -362,10 +384,19 @@ io.on("connection", (socket) => {
         }
       }
     } else if (socket.data.role === "host" && room.hostSocketId === socket.id) {
-      // Host rời phòng (đóng tab / thoát) -> đá toàn bộ người chơi về màn hình tham gia, dọn phòng.
-      clearTimeout(room._timer);
-      io.to(code).emit("room:closed");
-      delete rooms[code];
+      // Host mat ket noi (rot mang, tab bi treo do tai cao...) -> KHONG xoa phong ngay.
+      // Cho mot khoang an han de host tu ket noi lai (host:rejoin); game (timer cau hoi)
+      // van tiep tuc chay binh thuong trong luc cho. Qua thoi gian nay ma khong quay lai
+      // moi thuc su coi la host da roi phong va don dep.
+      room.hostSocketId = null;
+      clearTimeout(room.hostDisconnectTimer);
+      room.hostDisconnectTimer = setTimeout(() => {
+        const stillRoom = rooms[code];
+        if (!stillRoom || stillRoom.hostSocketId) return; // host da ket noi lai truoc do
+        clearTimeout(stillRoom._timer);
+        io.to(code).emit("room:closed");
+        delete rooms[code];
+      }, HOST_DISCONNECT_GRACE_MS);
     }
   });
 });

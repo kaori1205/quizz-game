@@ -517,7 +517,7 @@ document.addEventListener("fullscreenchange", ()=>{
 const urlParams = new URLSearchParams(location.search);
 const joinCodeFromUrl = urlParams.get("join");
 
-let state = { screen:"landing", role:null, code:"", totalQuestions:0, currentIndex:0,
+let state = { screen:"landing", role:null, code:"", hostToken:"", totalQuestions:0, currentIndex:0,
   answered:false, lastCorrect:null, lastPoints:0, correctIndex:null, correctText:"", explanation:"", chosenIndex:null,
   selectedIcon: ICON_OPTS[0], questionSets:[], playerName:"",
   resultsStage:"reveal", previousLeaderboard:null, isFirstQuestion:true,
@@ -1078,7 +1078,7 @@ function bind(){
     const questionSetId = sel && sel.value ? sel.value : undefined;
     socket.emit("host:create", { questionSetId }, (res)=>{
       if(!res.ok) return;
-      state.role="host"; state.code=res.code; state.totalQuestions=res.totalQuestions;
+      state.role="host"; state.code=res.code; state.totalQuestions=res.totalQuestions; state.hostToken=res.hostToken;
       state.screen="host_lobby"; render();
     });
   });
@@ -1289,6 +1289,16 @@ socket.on("connect", ()=>{
       applyResume(res.resume, state.screen);
       render();
       if(state.screen==="player_question") startTimerLoop();
+    });
+  } else if(state.role==="host" && state.code && state.hostToken){
+    // Socket bi rot tam thoi (mang chap chon, tai cao...) va vua ket noi lai — tu nhan
+    // lai dung phong cu (server giu phong trong mot khoang an han) thay vi mat trang.
+    socket.emit("host:rejoin", {code: state.code, hostToken: state.hostToken}, (res)=>{
+      if(!res.ok){ return; } // qua thoi gian an han, phong da bi don — giu nguyen man hinh hien tai
+      state.totalQuestions = res.totalQuestions;
+      applyResume(res.resume, state.screen);
+      render();
+      if(state.screen==="host_question") startTimerLoop();
     });
   }
 });
