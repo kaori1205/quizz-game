@@ -108,9 +108,9 @@
   .opt.opt-md{font-size:14px; padding:14px 14px; gap:8px;}
   .opt.opt-sm{font-size:12.5px; padding:12px 12px; gap:7px;}
   .opt.opt-xs{font-size:11.5px; padding:10px 10px; gap:6px; line-height:1.2;}
-  body.host-stage .opt.opt-md{font-size:clamp(15px,2vh,20px);}
-  body.host-stage .opt.opt-sm{font-size:clamp(14px,1.8vh,18px);}
-  body.host-stage .opt.opt-xs{font-size:clamp(13px,1.6vh,16px);}
+  /* Ben host, tat ca dap an dung chung 1 co chu co dinh (khong tu thu nho theo do dai
+     nua) de dong deu giua cac cau — dap an dai se tu xuong dong nhieu hon thay vi bi thu nho. */
+  body.host-stage .opt.opt-md, body.host-stage .opt.opt-sm, body.host-stage .opt.opt-xs{font-size:clamp(16px,2.2vh,22px);}
   .opt.red{background:var(--a-red); box-shadow:0 6px 0 0 #C23140;} .opt.blue{background:var(--a-blue); box-shadow:0 6px 0 0 #1560B0;} .opt.yellow{background:var(--a-yellow); box-shadow:0 6px 0 0 #C98600;} .opt.green{background:var(--a-green); box-shadow:0 6px 0 0 #1F9E5A;}
   .opt:not(:disabled):hover{transform:translateY(-2px);}
   .opt:not(:disabled):active{transform:translateY(4px); box-shadow:none !important;}
@@ -313,7 +313,7 @@
   body.host-stage .opt{min-height:clamp(52px,8vh,84px); font-size:clamp(16px,2.2vh,22px); padding:clamp(12px,1.8vh,20px) 18px; border-radius:16px; gap:12px;}
   body.host-stage .opt-logo{width:clamp(24px,3.4vh,34px); height:clamp(24px,3.4vh,34px);}
   body.host-stage .opt-logo span{font-size:clamp(14px,1.8vh,19px);}
-  body.host-stage .opt:disabled{opacity:1;}
+  body.host-stage .opt:disabled{opacity:1 !important;}
   body.host-stage.host-reveal .opt:disabled:not(.reveal-correct){opacity:.45 !important;}
   body.host-stage .divider{margin:clamp(10px,1.6vh,18px) 0;}
   body.host-stage #answered-count{font-size:clamp(13px,1.6vh,16px); margin:clamp(8px,1.4vh,14px) 0;}
