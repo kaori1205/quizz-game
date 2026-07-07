@@ -15,6 +15,15 @@ const QUESTION_DURATION = 20000; // 20 giây mỗi câu
 // ho thoi gian nay de tu ket noi lai truoc khi phong bi xoa va tat ca nguoi choi bi da ra.
 const HOST_DISCONNECT_GRACE_MS = 20000;
 
+// Mat khau chung bao ve trang "Quan ly bo cau hoi" va an cac bo cau hoi tuy chinh khoi
+// dropdown "Tao phong" doi voi nguoi khong biet mat khau (ho van thay + dung duoc "Bo mac dinh").
+// Dat bien moi truong ADMIN_PASSWORD (trong .env khi chay local, va trong cai dat cua dich vu
+// tren Render khi trien khai that) — neu de trong thi coi nhu tinh nang nay tat (giong truoc day).
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "";
+function isAdminRequest(req) {
+  return !!ADMIN_PASSWORD && req.get("x-admin-password") === ADMIN_PASSWORD;
+}
+
 // Danh sách icon avatar hợp lệ (ứng với ảnh trong public/avt) — dùng để kiểm tra
 // icon người chơi gửi lên có hợp lệ không, tránh nhận icon tuỳ ý không xác định.
 const VALID_ICONS = ["avt-1", "avt-2", "avt-3", "avt-4", "avt-5", "avt-6", "avt-7", "avt-8", "avt-9", "avt-10"];
@@ -55,18 +64,30 @@ app.get("/api/rooms/:code", (req, res) => {
   res.json({ ok: true, code: req.params.code });
 });
 
+// ---- API: xac thuc mat khau admin (dung de mo khoa trang quan ly + dropdown tao phong) ----
+app.post("/api/admin/verify", (req, res) => {
+  const { password } = req.body || {};
+  if (!!ADMIN_PASSWORD && password === ADMIN_PASSWORD) return res.json({ ok: true });
+  res.status(401).json({ ok: false, error: "Sai mật khẩu." });
+});
+
 // ---- API: bộ câu hỏi (đề thi có thể lưu và tái sử dụng) ----
+// Nguoi khong co mat khau admin chi thay danh sach RONG (dropdown tao phong se chi con
+// "Bo mac dinh"), khong lam lo ten cac bo cau hoi tuy chinh.
 app.get("/api/question-sets", async (req, res) => {
+  if (!isAdminRequest(req)) return res.json([]);
   res.json(await db.listQuestionSets());
 });
 
 app.get("/api/question-sets/:id", async (req, res) => {
+  if (!isAdminRequest(req)) return res.status(401).json({ error: "Cần mật khẩu admin." });
   const set = await db.getQuestionSet(req.params.id);
   if (!set) return res.status(404).json({ error: "Không tìm thấy bộ câu hỏi." });
   res.json(set);
 });
 
 app.post("/api/question-sets", async (req, res) => {
+  if (!isAdminRequest(req)) return res.status(401).json({ error: "Cần mật khẩu admin." });
   const { name, duration, questions } = req.body || {};
   const set = await db.createQuestionSet({ name, duration, questions });
   if (!set) return res.status(400).json({ error: "Cần ít nhất 1 câu hỏi hợp lệ (có đủ 4 đáp án)." });
@@ -74,6 +95,7 @@ app.post("/api/question-sets", async (req, res) => {
 });
 
 app.put("/api/question-sets/:id", async (req, res) => {
+  if (!isAdminRequest(req)) return res.status(401).json({ error: "Cần mật khẩu admin." });
   const { name, duration, questions } = req.body || {};
   const set = await db.updateQuestionSet(req.params.id, { name, duration, questions });
   if (!set) return res.status(400).json({ error: "Không tìm thấy bộ câu hỏi hoặc dữ liệu không hợp lệ." });
@@ -81,6 +103,7 @@ app.put("/api/question-sets/:id", async (req, res) => {
 });
 
 app.delete("/api/question-sets/:id", async (req, res) => {
+  if (!isAdminRequest(req)) return res.status(401).json({ error: "Cần mật khẩu admin." });
   const ok = await db.deleteQuestionSet(req.params.id);
   if (!ok) return res.status(404).json({ error: "Không tìm thấy bộ câu hỏi." });
   res.json({ ok: true });

@@ -102,14 +102,25 @@
   .btn.add-q:active{transform:translateY(1px);}
   .editor-footer{display:flex; gap:10px; margin-top:16px; flex-wrap:wrap;}
   .hint{font-size:13px; color:var(--text-dim); margin:0 0 16px; font-family:Arial,sans-serif;}
+  #gate-error{color:var(--red); font-size:14px; margin-top:10px; display:none; font-family:Arial,sans-serif;}
 </style>
 </head>
 <body>
+  <!-- ===== MAT KHAU GATE: che het noi dung cho toi khi nhap dung mat khau admin ===== -->
+  <div class="card" id="view-gate" style="max-width:380px; width:100%; margin-top:10vh;">
+    <h2 style="margin-top:0">Nhập mật khẩu quản trị</h2>
+    <p class="muted">Trang này chỉ dành cho quản trị viên. Nhập mật khẩu để tiếp tục.</p>
+    <div class="field">
+      <input type="password" id="gate-password" placeholder="Mật khẩu admin" style="width:100%; border:2px solid var(--line); border-radius:10px; padding:10px 12px; font-size:15px; font-family:Arial,sans-serif;">
+    </div>
+    <button class="btn primary" id="gate-submit" style="width:100%">Vào trang quản lý</button>
+    <div id="gate-error"></div>
+  </div>
   <a class="brand" href="/">
     <div class="logo"><img src="logo.jpg" alt="Live!QUIZZ logo" onerror="this.style.display='none'"></div>
     <span class="title" aria-label="Live!QUIZZ"><span class="letter">L</span><span class="letter">i</span><span class="letter">v</span><span class="letter">e</span><span class="letter bang">!</span><span class="letter">Q</span><span class="letter">U</span><span class="letter">I</span><span class="letter">Z</span><span class="letter">Z</span></span>
   </a>
-  <div id="wrap">
+  <div id="wrap" style="display:none">
     <div class="top-bar">
       <h1 id="page-title">Quản lý bộ câu hỏi</h1>
       <a class="link-btn" href="/">← Về trang chủ</a>
@@ -162,6 +173,37 @@ let editingId = null;   // null = tạo mới
 let questions = [];     // [{q, options:[4], correct}]
 
 const $ = (id)=>document.getElementById(id);
+
+// ---------------- Mat khau admin ----------------
+// Luu mat khau (da xac thuc) vao localStorage de khong phai nhap lai moi lan mo trang tren
+// cung 1 trinh duyet. Moi request goi API deu dinh kem header nay; server tu kiem tra dung/sai.
+function getAdminPassword(){ return localStorage.getItem("quizAdminPassword") || ""; }
+function setAdminPassword(pw){ localStorage.setItem("quizAdminPassword", pw); }
+function adminFetch(url, opts){
+  opts = opts || {};
+  opts.headers = Object.assign({}, opts.headers, { "x-admin-password": getAdminPassword() });
+  return fetch(url, opts);
+}
+async function tryEnterAdmin(password){
+  const res = await fetch("/api/admin/verify", {
+    method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({password}),
+  });
+  if(!res.ok) return false;
+  setAdminPassword(password);
+  $("view-gate").style.display = "none";
+  $("wrap").style.display = "block";
+  loadSets();
+  return true;
+}
+$("gate-submit").onclick = async ()=>{
+  const pw = $("gate-password").value;
+  const errBox = $("gate-error");
+  const ok = await tryEnterAdmin(pw);
+  if(!ok){ errBox.innerText = "Sai mật khẩu, vui lòng thử lại."; errBox.style.display = "block"; }
+};
+$("gate-password").addEventListener("keydown", (e)=>{ if(e.key==="Enter") $("gate-submit").click(); });
+// Da tung nhap dung mat khau tren trinh duyet nay truoc do -> vao thang, khong hoi lai.
+if(getAdminPassword()){ tryEnterAdmin(getAdminPassword()); }
 const esc = (s)=> String(s==null?"":s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 
 function blankQuestion(){
@@ -178,7 +220,7 @@ const OPT_STYLES = [
 
 // ---------------- List view ----------------
 async function loadSets(){
-  const res = await fetch(API);
+  const res = await adminFetch(API);
   sets = await res.json();
   renderList();
 }
@@ -211,18 +253,18 @@ function renderList(){
 
 async function handleListAction(act, id){
   if(act==="edit"){
-    const res = await fetch(`${API}/${id}`);
+    const res = await adminFetch(`${API}/${id}`);
     if(!res.ok) return alert("Không tìm thấy bộ câu hỏi.");
     const set = await res.json();
     openEditor(set);
   } else if(act==="dup"){
-    const res = await fetch(`${API}/${id}`);
+    const res = await adminFetch(`${API}/${id}`);
     if(!res.ok) return alert("Không tìm thấy bộ câu hỏi.");
     const set = await res.json();
     openEditor({ name: set.name + " (bản sao)", duration: set.duration, questions: set.questions }, true);
   } else if(act==="del"){
     if(!confirm("Xoá bộ câu hỏi này? Không thể hoàn tác.")) return;
-    const res = await fetch(`${API}/${id}`, { method:"DELETE" });
+    const res = await adminFetch(`${API}/${id}`, { method:"DELETE" });
     if(res.ok) loadSets();
     else alert("Xoá thất bại.");
   }
@@ -341,7 +383,7 @@ async function saveSet(){
 
   const url = editingId ? `${API}/${editingId}` : API;
   const method = editingId ? "PUT" : "POST";
-  const res = await fetch(url, { method, headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) });
+  const res = await adminFetch(url, { method, headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) });
   if(!res.ok){
     const data = await res.json().catch(()=>({}));
     errBox.innerText = data.error || "Lưu thất bại, vui lòng thử lại.";
@@ -356,8 +398,6 @@ $("btn-new-set").onclick = ()=> openEditor(null);
 $("btn-add-question").onclick = ()=>{ questions.push(blankQuestion()); renderQuestions(); };
 $("btn-save-set").onclick = saveSet;
 $("btn-cancel-edit").onclick = closeEditor;
-
-loadSets();
 </script>
 </body>
 </html>

@@ -534,14 +534,29 @@ let currentDuration = 20000, currentStart = 0;
 
 function el(id){ return document.getElementById(id); }
 
+// Nguoi khong biet mat khau admin chi thay "Bo mac dinh" trong dropdown tao phong — server
+// tra ve danh sach rong neu khong dinh kem dung mat khau. Da tung mo khoa tren trinh duyet
+// nay thi tu dong gui kem, khong can nhap lai.
+function getAdminPassword(){ return localStorage.getItem("quizAdminPassword") || ""; }
 function loadQuestionSets(){
-  fetch("/api/question-sets")
+  fetch("/api/question-sets", { headers: { "x-admin-password": getAdminPassword() } })
     .then(r=>r.json())
     .then(list=>{
       state.questionSets = Array.isArray(list) ? list : [];
       if(state.screen==="host_setup") render();
     })
     .catch(()=>{ /* giữ danh sách rỗng, vẫn dùng được bộ mặc định */ });
+}
+function unlockMyQuestionSets(){
+  const pw = prompt("Nhập mật khẩu admin để xem bộ câu hỏi của bạn:");
+  if(pw==null) return;
+  fetch("/api/admin/verify", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({password: pw}) })
+    .then(r=>{
+      if(!r.ok) throw new Error("wrong");
+      localStorage.setItem("quizAdminPassword", pw);
+      loadQuestionSets();
+    })
+    .catch(()=> alert("Sai mật khẩu."));
 }
 function esc(s){ const d=document.createElement("div"); d.innerText=s; return d.innerHTML; }
 // Ho tro mot cu phap markdown-lite don gian trong noi dung cau hoi/giai thich: **dam** va
@@ -703,7 +718,10 @@ function viewHostSetup(){
   return `<div class="card center"><h2 style="margin-top:0">Tạo phòng mới</h2>
   <p class="muted">Server sẽ sinh mã phòng tự động.</p>
   <div class="field" style="text-align:left; margin:16px 0;">
-    <label style="display:block; font-weight:700; font-size:13px; margin-bottom:6px; color:var(--text-dim);">Chọn bộ câu hỏi</label>
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+      <label style="display:block; font-weight:700; font-size:13px; color:var(--text-dim); margin:0;">Chọn bộ câu hỏi</label>
+      <span id="unlock-my-sets" style="font-size:12px; color:var(--text-dim); cursor:pointer; text-decoration:underline;">🔒 Bộ của tôi</span>
+    </div>
     <select id="question-set-select" style="width:100%; border:1px solid var(--line); border-radius:10px; padding:10px 12px; font-size:15px; font-family:Arial,sans-serif; color:var(--text); background:#fff;">${options}</select>
   </div>
   <button class="primary block" id="create-room">Tạo phòng ngay</button>
@@ -1041,6 +1059,8 @@ function bind(){
   const b=(id,fn)=>{ const n=el(id); if(n) n.onclick=()=>{ Sound.sfx.click(); fn(); }; };
   b("pick-host", ()=>{ state.screen="host_setup"; render(); loadQuestionSets(); });
   b("pick-player", ()=>{ state.screen="player_join"; render(); });
+  const unlockEl = el("unlock-my-sets");
+  if(unlockEl) unlockEl.onclick = unlockMyQuestionSets;
   b("pick-history", ()=>{ location.href="/history.html"; });
   b("pick-admin", ()=>{ location.href="/admin.html"; });
   b("back-landing", ()=>{
