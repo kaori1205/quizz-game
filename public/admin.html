@@ -81,7 +81,9 @@
   .q-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;}
   .q-badge{display:inline-flex; align-items:center; justify-content:center; padding:4px 14px; border-radius:999px;
     font-weight:700; font-size:13px; font-family:Arial,sans-serif; letter-spacing:.2px;}
-  .opt-row{display:flex; align-items:center; gap:10px; margin-bottom:10px; padding:10px 14px; border-radius:14px;
+  .opt-wrap{margin-bottom:10px;}
+  .opt-wrap .opt-row{margin-bottom:4px;}
+  .opt-row{display:flex; align-items:center; gap:10px; padding:10px 14px; border-radius:14px;
     border:2px solid var(--line); transition:transform .12s, box-shadow .12s;}
   .opt-row:hover{transform:translateY(-1px);}
   .opt-row:has(input:checked){box-shadow:0 5px 14px rgba(20,10,50,.18); transform:translateY(-1px);}
@@ -97,8 +99,21 @@
   .fmt-btn{border:1px solid rgba(5,38,153,.35); background:#fff; color:#052699; border-radius:6px; width:30px; height:26px;
     font-family:Arial,sans-serif; font-size:13px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0;}
   .fmt-btn:hover{background:rgba(5,38,153,.1);}
+  .fmt-toolbar-sm{margin:0 0 0 34px; gap:4px;}
+  .fmt-btn-xs{width:22px; height:19px; font-size:11px; border-radius:5px; opacity:.75;}
+  .fmt-btn-xs:hover{opacity:1;}
+  .opt-preview{flex:1; min-width:0; font-size:12px; color:var(--text-dim); font-family:Arial,sans-serif;
+    padding-left:6px; border-left:1px solid var(--line);}
+  .opt-preview p, .opt-preview ul{margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .opt-preview strong{color:var(--text); font-weight:700;}
+  .opt-preview em, .opt-preview u{color:var(--text);}
   .fmt-btn.fmt-italic{font-style:italic; font-weight:400;}
   .fmt-btn.fmt-underline{text-decoration:underline; font-weight:400;}
+  .explain-preview-label{font-size:11px; font-weight:700; color:var(--text-dim); text-transform:uppercase; letter-spacing:.4px; margin:10px 0 4px;}
+  .explain-preview{background:#fff; border:1px solid var(--line); border-radius:10px; padding:10px 12px; font-family:Arial,sans-serif; font-size:14px; line-height:1.4; color:var(--text);}
+  .explain-preview p{margin:0 0 6px;} .explain-preview p:last-child{margin-bottom:0;}
+  .explain-preview ul{margin:6px 0; padding-left:1.3em;} .explain-preview li{margin:3px 0;}
+  .explain-preview .explain-preview-empty{color:var(--text-dim); font-style:italic;}
 
   #editor-error{color:var(--red); font-size:14px; margin-bottom:10px; display:none; font-family:Arial,sans-serif;}
   .section-divider{height:1px; background:var(--line); margin:20px 0;}
@@ -213,6 +228,29 @@ $("gate-password").addEventListener("keydown", (e)=>{ if(e.key==="Enter") $("gat
 if(getAdminPassword()){ tryEnterAdmin(getAdminPassword()); }
 const esc = (s)=> String(s==null?"":s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 
+// Giong het formatRichText trong public/index.html — dung de xem truoc dung y het luc choi
+// game se hien nhu the nao (dam/nghieng/gach chan/gach dau dong).
+function formatRichText(raw){
+  const lines = (raw || "").split(/\r?\n/);
+  let html = "", inList = false;
+  for(const rawLine of lines){
+    const line = rawLine.trim();
+    const bulletMatch = line.match(/^[-•]\s+(.*)$/);
+    if(bulletMatch){
+      if(!inList){ html += `<ul class="rich-list">`; inList = true; }
+      html += `<li>${esc(bulletMatch[1])}</li>`;
+    } else {
+      if(inList){ html += "</ul>"; inList = false; }
+      if(line) html += `<p>${esc(line)}</p>`;
+    }
+  }
+  if(inList) html += "</ul>";
+  html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  html = html.replace(/__(.+?)__/g, "<u>$1</u>");
+  html = html.replace(/\*(.+?)\*/g, "<em>$1</em>");
+  return html || `<span class="explain-preview-empty">(chưa có nội dung)</span>`;
+}
+
 function blankQuestion(){
   return { q:"", options:["","","",""], correct:0, explanation:"" };
 }
@@ -220,6 +258,8 @@ function blankQuestion(){
 // Boc vung dang chon trong textarea bang cu phap markdown-lite tuong ung (**dam**, *nghieng*,
 // __gach chan__ — dung cu phap giong voi phan hien thi thuc te trong game, xem formatRichText
 // trong public/index.html). Neu chua chon gi thi dat con tro giua 2 marker de go tiep.
+// Neu vung chon DA duoc boc san bang marker nay roi (bam nham 2 lan) thi bo di thay vi chong
+// them, tranh sinh ra chuoi dau ****** loi nhu bao cao.
 function applyFormatting(ta, fmt){
   const markers = { bold:"**", italic:"*", underline:"__" };
   const marker = markers[fmt];
@@ -227,13 +267,23 @@ function applyFormatting(ta, fmt){
   const start = ta.selectionStart, end = ta.selectionEnd;
   const val = ta.value;
   const selected = val.slice(start, end);
-  ta.value = val.slice(0, start) + marker + selected + marker + val.slice(end);
-  ta.focus();
-  if(selected){
-    ta.selectionStart = start + marker.length;
-    ta.selectionEnd = start + marker.length + selected.length;
+  const mLen = marker.length;
+  const before = val.slice(Math.max(0, start - mLen), start);
+  const after = val.slice(end, end + mLen);
+  if(selected && before === marker && after === marker){
+    ta.value = val.slice(0, start - mLen) + selected + val.slice(end + mLen);
+    ta.focus();
+    ta.selectionStart = start - mLen;
+    ta.selectionEnd = start - mLen + selected.length;
   } else {
-    ta.selectionStart = ta.selectionEnd = start + marker.length;
+    ta.value = val.slice(0, start) + marker + selected + marker + val.slice(end);
+    ta.focus();
+    if(selected){
+      ta.selectionStart = start + marker.length;
+      ta.selectionEnd = start + marker.length + selected.length;
+    } else {
+      ta.selectionStart = ta.selectionEnd = start + marker.length;
+    }
   }
 }
 
@@ -330,26 +380,44 @@ function renderQuestions(){
         <button class="btn small danger" type="button" data-remove-q="${qi}" ${questions.length<=1?"disabled":""}>Xoá câu</button>
       </div>
       <div class="field">
-        <textarea rows="2" placeholder="Nhập nội dung câu hỏi..." data-q-text="${qi}">${esc(q.q)}</textarea>
+        <div class="fmt-toolbar">
+          <button type="button" class="fmt-btn" data-fmt="bold" data-target="q-text-${qi}" title="In đậm">B</button>
+          <button type="button" class="fmt-btn fmt-italic" data-fmt="italic" data-target="q-text-${qi}" title="In nghiêng">I</button>
+          <button type="button" class="fmt-btn fmt-underline" data-fmt="underline" data-target="q-text-${qi}" title="Gạch chân">U</button>
+        </div>
+        <textarea id="q-text-${qi}" rows="2" placeholder="Nhập nội dung câu hỏi..." data-q-text="${qi}">${esc(q.q)}</textarea>
+        <div class="explain-preview-label">Xem trước</div>
+        <div class="explain-preview" data-preview-text="${qi}">${formatRichText(q.q)}</div>
       </div>
       ${q.options.map((opt, oi)=>{
         const oc = OPT_STYLES[oi];
         const letter = String.fromCharCode(65 + oi); // A, B, C, D
+        const optId = `q-opt-${qi}-${oi}`;
         return `
-        <div class="opt-row" style="background:${oc.bg}; border-color:${oc.border}">
-          <input type="radio" name="correct-${qi}" ${q.correct===oi?"checked":""} data-q-correct="${qi}" data-opt-index="${oi}" style="accent-color:${oc.solid}">
-          <span class="opt-tag" style="color:${oc.solid}">${letter}</span>
-          <textarea rows="1" placeholder="Nội dung đáp án ${letter}" data-q-opt="${qi}" data-opt-index="${oi}" style="border-color:${oc.border}; background:#fff;">${esc(opt)}</textarea>
+        <div class="opt-wrap">
+          <div class="opt-row" style="background:${oc.bg}; border-color:${oc.border}">
+            <input type="radio" name="correct-${qi}" ${q.correct===oi?"checked":""} data-q-correct="${qi}" data-opt-index="${oi}" style="accent-color:${oc.solid}">
+            <span class="opt-tag" style="color:${oc.solid}">${letter}</span>
+            <textarea id="${optId}" rows="1" placeholder="Nội dung đáp án ${letter}" data-q-opt="${qi}" data-opt-index="${oi}" style="border-color:${oc.border}; background:#fff;">${esc(opt)}</textarea>
+          </div>
+          <div class="fmt-toolbar fmt-toolbar-sm">
+            <button type="button" class="fmt-btn fmt-btn-xs" data-fmt="bold" data-target="${optId}" title="In đậm">B</button>
+            <button type="button" class="fmt-btn fmt-btn-xs fmt-italic" data-fmt="italic" data-target="${optId}" title="In nghiêng">I</button>
+            <button type="button" class="fmt-btn fmt-btn-xs fmt-underline" data-fmt="underline" data-target="${optId}" title="Gạch chân">U</button>
+            <div class="opt-preview" data-preview-opt="${qi}-${oi}">${formatRichText(opt)}</div>
+          </div>
         </div>`;
       }).join("")}
       <div class="field explain-field">
         <label>Giải thích đáp án đúng (không bắt buộc)</label>
         <div class="fmt-toolbar">
-          <button type="button" class="fmt-btn" data-fmt="bold" data-qi="${qi}" title="In đậm">B</button>
-          <button type="button" class="fmt-btn fmt-italic" data-fmt="italic" data-qi="${qi}" title="In nghiêng">I</button>
-          <button type="button" class="fmt-btn fmt-underline" data-fmt="underline" data-qi="${qi}" title="Gạch chân">U</button>
+          <button type="button" class="fmt-btn" data-fmt="bold" data-target="q-explain-${qi}" title="In đậm">B</button>
+          <button type="button" class="fmt-btn fmt-italic" data-fmt="italic" data-target="q-explain-${qi}" title="In nghiêng">I</button>
+          <button type="button" class="fmt-btn fmt-underline" data-fmt="underline" data-target="q-explain-${qi}" title="Gạch chân">U</button>
         </div>
-        <textarea rows="2" placeholder="Ví dụ: Hà Nội là thủ đô của Việt Nam từ năm 1010, khi vua Lý Thái Tổ dời đô về Thăng Long..." data-q-explain="${qi}">${esc(q.explanation||"")}</textarea>
+        <textarea id="q-explain-${qi}" rows="2" placeholder="Ví dụ: Hà Nội là thủ đô của Việt Nam từ năm 1010, khi vua Lý Thái Tổ dời đô về Thăng Long..." data-q-explain="${qi}">${esc(q.explanation||"")}</textarea>
+        <div class="explain-preview-label">Xem trước</div>
+        <div class="explain-preview" data-preview="${qi}">${formatRichText(q.explanation||"")}</div>
       </div>
     </div>`;
   }).join("");
@@ -363,18 +431,37 @@ function renderQuestions(){
       renderQuestions();
     };
   });
+  function updateTextPreview(qi){
+    const box = wrap.querySelector(`[data-preview-text="${qi}"]`);
+    if(box) box.innerHTML = formatRichText(questions[qi].q || "");
+  }
+  function updateExplainPreview(qi){
+    const box = wrap.querySelector(`[data-preview="${qi}"]`);
+    if(box) box.innerHTML = formatRichText(questions[qi].explanation || "");
+  }
   wrap.querySelectorAll("[data-q-text]").forEach(t=>{
-    t.oninput = ()=>{ questions[Number(t.dataset.qText)].q = t.value; };
+    t.oninput = ()=>{
+      const qi = Number(t.dataset.qText);
+      questions[qi].q = t.value;
+      updateTextPreview(qi);
+    };
   });
   wrap.querySelectorAll("[data-q-explain]").forEach(t=>{
-    t.oninput = ()=>{ questions[Number(t.dataset.qExplain)].explanation = t.value; };
+    t.oninput = ()=>{
+      const qi = Number(t.dataset.qExplain);
+      questions[qi].explanation = t.value;
+      updateExplainPreview(qi);
+    };
   });
+  // Nut dinh dang dung chung cho ca 3 loai o (cau hoi, dap an, giai thich) — xac dinh
+  // textarea can tac dong qua id trong data-target, roi phat lai su kien "input" de cac
+  // handler oninput da co san (cap nhat state + preview) tu chay, khong can lap lai logic.
   wrap.querySelectorAll("[data-fmt]").forEach(btn=>{
     btn.onclick = ()=>{
-      const qi = Number(btn.dataset.qi);
-      const ta = wrap.querySelector(`textarea[data-q-explain="${qi}"]`);
+      const ta = document.getElementById(btn.dataset.target);
+      if(!ta) return;
       applyFormatting(ta, btn.dataset.fmt);
-      questions[qi].explanation = ta.value;
+      ta.dispatchEvent(new Event("input"));
     };
   });
   wrap.querySelectorAll("[data-q-opt]").forEach(t=>{
@@ -383,6 +470,8 @@ function renderQuestions(){
       const qi = Number(t.dataset.qOpt), oi = Number(t.dataset.optIndex);
       questions[qi].options[oi] = t.value;
       autoResize(t);
+      const prev = wrap.querySelector(`[data-preview-opt="${qi}-${oi}"]`);
+      if(prev) prev.innerHTML = formatRichText(t.value);
     };
   });
   wrap.querySelectorAll("[data-q-correct]").forEach(r=>{
