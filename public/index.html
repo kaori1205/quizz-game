@@ -579,7 +579,12 @@ function formatRichText(raw){
     }
   }
   if(inList) html += "</ul>";
-  return html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  // Thu tu quan trong: xu ly **dam** truoc, roi moi den *nghieng* (neu doi nguoc lai,
+  // *nghieng* se "an" mat 1 cap * cua **dam** con lai, sinh sai ket qua).
+  html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  html = html.replace(/__(.+?)__/g, "<u>$1</u>");
+  html = html.replace(/\*(.+?)\*/g, "<em>$1</em>");
+  return html;
 }
 
 function render(){
