@@ -73,8 +73,18 @@
   .qr-box{background:#fff; padding:10px; border-radius:12px; display:inline-flex; align-items:center; justify-content:center; cursor:zoom-in; transition:transform .15s;}
   .qr-box:hover{transform:scale(1.03);}
   .qr-modal-overlay{position:fixed; inset:0; background:rgba(20,10,50,.75); backdrop-filter:blur(4px); display:flex; align-items:center; justify-content:center; z-index:50; cursor:zoom-out; padding:24px;}
-  .qr-modal-box{background:#fff; padding:28px; border-radius:22px; display:flex; flex-direction:column; align-items:center; gap:14px; box-shadow:0 24px 48px rgba(0,0,0,.4);}
+  .qr-modal-box{background:#fff; padding:28px; border-radius:22px; display:flex; flex-direction:row; align-items:stretch; gap:24px; box-shadow:0 24px 48px rgba(0,0,0,.4); cursor:default; height:min(456px,90vh); max-height:90vh;}
+  .qr-modal-side{display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; flex-shrink:0;}
   .qr-modal-code{font-family:Arial,sans-serif; font-weight:700; font-size:22px; letter-spacing:6px; color:#241B4D;}
+  .qr-modal-players-side{width:240px; flex-shrink:0; height:100%; border-left:1px solid var(--line); padding-left:24px; display:flex; flex-direction:column; min-height:0; font-family:Arial,sans-serif;}
+  .qr-modal-players-title{font-weight:700; font-size:15px; color:var(--text); margin-bottom:6px; flex-shrink:0;}
+  .qr-modal-players-side .muted{font-size:13px; margin:0 0 10px; flex-shrink:0;}
+  .qr-modal-players-side .player-list{flex:1 1 auto; min-height:0; overflow-y:auto; max-height:none; margin-top:0; flex-wrap:nowrap; flex-direction:column; align-items:stretch;}
+  .qr-modal-players-side .player-chip{align-self:stretch; width:100%; flex-shrink:0;}
+  @media (max-width:640px){
+    .qr-modal-box{flex-direction:column; height:auto; max-height:90vh; max-width:100%;}
+    .qr-modal-players-side{width:100%; height:auto; border-left:none; border-top:1px solid var(--line); padding-left:0; padding-top:16px; max-height:200px;}
+  }
 
   /* ===== Host lobby card: compact code/QR (1/10) + dominant player list (9/10) ===== */
   .card.lobby-card{display:flex; flex-direction:column; min-height:clamp(420px,64vh,600px);}
@@ -523,6 +533,9 @@ let state = { screen:"landing", role:null, code:"", hostToken:"", totalQuestions
   resultsStage:"reveal", previousLeaderboard:null, isFirstQuestion:true,
   myResults:null };
 let revealTimer = null, podiumTimer = null;
+// Danh sach nguoi choi trong sanh cho gan nhat (tu socket "lobby:update"), luu lai de khung
+// phong to QR co the hien ngay khi mo, khong can cho su kien tiep theo moi co du lieu.
+let lastLobbyPlayers = [];
 
 function getClientId(){
   let id = localStorage.getItem("quizClientId");
@@ -641,12 +654,25 @@ function openQrModal(){
   const modalBox = document.createElement("div");
   modalBox.className = "qr-modal-box";
   modalBox.onclick = (e)=> e.stopPropagation();
+  const qrSide = document.createElement("div");
+  qrSide.className = "qr-modal-side";
   const codeLabel = document.createElement("div");
   codeLabel.className = "qr-modal-code";
   codeLabel.innerText = state.code;
   const qrHolder = document.createElement("div");
-  modalBox.appendChild(codeLabel);
-  modalBox.appendChild(qrHolder);
+  qrSide.appendChild(codeLabel);
+  qrSide.appendChild(qrHolder);
+  // Cot ben: so nguoi + danh sach icon+ten, de host van theo doi duoc ai da vao phong
+  // du dang phong to QR che het man hinh sanh cho phia sau.
+  const playersSide = document.createElement("div");
+  playersSide.className = "qr-modal-players-side";
+  playersSide.innerHTML = `
+    <div class="qr-modal-players-title">Người chơi trong phòng</div>
+    <p class="muted" id="qr-modal-count">${lobbyCountText(lastLobbyPlayers)}</p>
+    <div class="player-list" id="qr-modal-players">${lobbyPlayersHtml(lastLobbyPlayers)}</div>
+  `;
+  modalBox.appendChild(qrSide);
+  modalBox.appendChild(playersSide);
   overlay.appendChild(modalBox);
   document.body.appendChild(overlay);
   new QRCode(qrHolder, { text: joinUrl, width: 320, height: 320, colorDark:"#241B4D", colorLight:"#ffffff" });
@@ -1163,9 +1189,19 @@ function startTimerLoop(){
 }
 
 // ---- Socket events ----
+// Dung chung cho ca man hinh sanh cho lan khung phong to QR, tranh lap code.
+function lobbyCountText(players){
+  return players.length ? `${players.length} người đã tham gia` : "Đang chờ người chơi…";
+}
+function lobbyPlayersHtml(players){
+  return players.map(p=>`<div class="player-chip"><div class="avatar">${avatarHtml(p.icon, p.name)}</div>${esc(p.name)}</div>`).join("");
+}
 socket.on("lobby:update", ({players})=>{
-  const c = el("lobby-count"); if(c) c.innerText = players.length? `${players.length} người đã tham gia` : "Đang chờ người chơi…";
-  const l = el("lobby-players"); if(l) l.innerHTML = players.map(p=>`<div class="player-chip"><div class="avatar">${avatarHtml(p.icon, p.name)}</div>${esc(p.name)}</div>`).join("");
+  lastLobbyPlayers = players;
+  const c = el("lobby-count"); if(c) c.innerText = lobbyCountText(players);
+  const l = el("lobby-players"); if(l) l.innerHTML = lobbyPlayersHtml(players);
+  const mc = el("qr-modal-count"); if(mc) mc.innerText = lobbyCountText(players);
+  const ml = el("qr-modal-players"); if(ml) ml.innerHTML = lobbyPlayersHtml(players);
 });
 
 function applyQuestionData(data){
