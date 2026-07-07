@@ -54,6 +54,11 @@
   input:focus{border-color:var(--primary-2);}
   label{font-size:13px; color:var(--text-dim); font-weight:600; margin-bottom:4px; display:block;}
   .role-pick{display:grid; grid-template-columns:1fr 1fr; gap:14px; width:100%;}
+  .setting-list{display:flex; flex-direction:column; gap:10px;}
+  .setting-row{display:flex; align-items:center; gap:10px; background:var(--panel-2); border:1px solid var(--line); border-radius:12px; padding:12px 14px; cursor:pointer; transition:border-color .12s;}
+  .setting-row:hover{border-color:var(--primary-2);}
+  .setting-row input[type=checkbox]{width:20px; height:20px; flex-shrink:0; cursor:pointer; accent-color:var(--primary);}
+  .setting-row span{font-size:14px; font-weight:600; color:var(--text);}
   .role-btn{border:none; border-radius:18px; padding:32px 14px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; cursor:pointer; text-align:center; transition:transform .15s,box-shadow .15s; font-family:Arial,sans-serif; font-weight:700; font-size:19px;}
   .role-btn:hover{transform:translateY(-3px);}
   .role-btn:active{transform:translateY(2px);}
@@ -807,6 +812,19 @@ function viewHostSetup(){
     </div>
     <select id="question-set-select" style="width:100%; border:1px solid var(--line); border-radius:10px; padding:10px 12px; font-size:15px; font-family:Arial,sans-serif; color:var(--text); background:#fff;">${options}</select>
   </div>
+  <div class="field" style="text-align:left; margin:16px 0;">
+    <label style="display:block; margin-bottom:8px;">Cài đặt</label>
+    <div class="setting-list">
+      <label class="setting-row">
+        <input type="checkbox" id="opt-shuffle-questions">
+        <span>Trộn thứ tự câu hỏi</span>
+      </label>
+      <label class="setting-row">
+        <input type="checkbox" id="opt-shuffle-answers">
+        <span>Trộn thứ tự đáp án</span>
+      </label>
+    </div>
+  </div>
   <button class="primary block" id="create-room">Tạo phòng ngay</button>
   <button class="secondary block" id="back-landing" style="margin-top:10px">Về trang chủ</button>
   </div>`;
@@ -1181,7 +1199,9 @@ function bind(){
   b("create-room", ()=>{
     const sel = el("question-set-select");
     const questionSetId = sel && sel.value ? sel.value : undefined;
-    socket.emit("host:create", { questionSetId }, (res)=>{
+    const shuffleQuestions = !!(el("opt-shuffle-questions") && el("opt-shuffle-questions").checked);
+    const shuffleAnswers = !!(el("opt-shuffle-answers") && el("opt-shuffle-answers").checked);
+    socket.emit("host:create", { questionSetId, shuffleQuestions, shuffleAnswers }, (res)=>{
       if(!res.ok) return;
       state.role="host"; state.code=res.code; state.totalQuestions=res.totalQuestions; state.hostToken=res.hostToken;
       state.screen="host_lobby"; render();

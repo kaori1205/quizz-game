@@ -166,6 +166,34 @@ function genClientId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
 }
 
+// Tron ngau nhien 1 mang (Fisher-Yates), khong lam thay doi mang goc.
+function shuffleArray(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// Chuan bi danh sach cau hoi cho 1 phong moi: luon nhan ban sau (khong dung chung tham
+// chieu voi DEFAULT_QUESTIONS hay bo cau hoi trong DB) de tron thu tu ma khong lam anh
+// huong toi cac phong khac hoac ban goc da luu. Neu tron dap an, chi so "correct" duoc
+// tinh lai theo VI TRI GOC (khong so sanh text) de tranh loi khi co 2 dap an trung chu.
+function prepareQuestions(sourceQuestions, shuffleQuestions, shuffleAnswers) {
+  let qs = sourceQuestions.map((q) => ({ ...q, options: q.options.slice() }));
+  if (shuffleQuestions) qs = shuffleArray(qs);
+  if (shuffleAnswers) {
+    qs = qs.map((q) => {
+      const order = shuffleArray(q.options.map((_, i) => i));
+      const newOptions = order.map((i) => q.options[i]);
+      const newCorrect = order.indexOf(q.correct);
+      return { ...q, options: newOptions, correct: newCorrect };
+    });
+  }
+  return qs;
+}
+
 // Trạng thái hiện tại của phòng để 1 client vừa (re)connect bắt kịp đúng màn hình
 function buildResumePayload(room, clientId) {
   if (room.phase === "question") {
@@ -214,6 +242,8 @@ io.on("connection", (socket) => {
   // ---- HOST: tạo phòng ----
   socket.on("host:create", async (payload, cb) => {
     const questionSetId = payload && payload.questionSetId;
+    const shuffleQuestions = !!(payload && payload.shuffleQuestions);
+    const shuffleAnswers = !!(payload && payload.shuffleAnswers);
     let code;
     do { code = genCode(); } while (rooms[code]);
 
@@ -226,6 +256,7 @@ io.on("connection", (socket) => {
         if (set.duration > 0) duration = set.duration * 1000;
       }
     }
+    questions = prepareQuestions(questions, shuffleQuestions, shuffleAnswers);
 
     const hostToken = genClientId();
     rooms[code] = {
