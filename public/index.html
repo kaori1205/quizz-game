@@ -396,8 +396,14 @@ const Sound = (function(){
   let ctx = null, masterGain = null;
   let muted = localStorage.getItem("quizMuted") === "1";
   const bgmFiles = { lobby:"/bgm/lobby-extreme-sports-mayhem.mp3", question:"/bgm/question-techno-gameplay.mp3", podium:"/bgm/podium-techno-celebration.mp3" };
+  // Da do truc tiep waveform 3 file mp3 thuc te: lobby vao nhac ngay tu giay 0 (khong co
+  // khoang lang), podium im lang ~1.5s roi vao full ngay, question im lang ~2.2s roi vao nhip.
+  // Bo qua dung doan im lang dau nay de nhac khong con nghe "tre" so voi luc man hinh chuyen.
+  const bgmStartOffset = { lobby: 0, question: 2.2, podium: 1.5 };
   const bgmEls = {};
   let currentBgm = null;
+  const BGM_TARGET_VOLUME = 0.35;
+  const BGM_FADE_MS = 180; // fade ngan, chi du de tranh tieng "pop" khi chuyen nhac
 
   function ensureCtx(){
     if(!ctx){
@@ -413,10 +419,27 @@ const Sound = (function(){
     if(!bgmEls[name]){
       const a = new Audio(bgmFiles[name]);
       a.loop = true;
-      a.volume = muted ? 0 : 0.35;
+      a.preload = "auto";
+      a.volume = 0;
+      const offset = bgmStartOffset[name] || 0;
+      if(offset){
+        a.addEventListener("loadedmetadata", ()=>{
+          if(a.currentTime < 0.05) a.currentTime = Math.min(offset, Math.max(0, (a.duration||offset+1) - 0.5));
+        }, { once:true });
+      }
       bgmEls[name] = a;
     }
     return bgmEls[name];
+  }
+  function fadeBgmVolume(audio, from, to, ms, onDone){
+    const start = performance.now();
+    function step(now){
+      const t = Math.min(1, (now-start)/ms);
+      audio.volume = from + (to-from)*t;
+      if(t<1) requestAnimationFrame(step);
+      else if(onDone) onDone();
+    }
+    requestAnimationFrame(step);
   }
   function tone(freq, start, dur, type, peak){
     const c = ensureCtx();
@@ -483,26 +506,37 @@ const Sound = (function(){
   };
   function playBgm(name){
     if(currentBgm === name) return;
-    Object.keys(bgmEls).forEach(k=>{ if(k!==name) bgmEls[k].pause(); });
+    const prevName = currentBgm;
     currentBgm = name;
+    if(prevName && bgmEls[prevName]){
+      const prevEl = bgmEls[prevName];
+      fadeBgmVolume(prevEl, prevEl.volume, 0, BGM_FADE_MS, ()=> prevEl.pause());
+    }
     if(!name || muted) return;
-    ensureBgm(name).play().catch(()=>{});
+    const a = ensureBgm(name);
+    a.volume = 0;
+    a.play().catch(()=>{});
+    fadeBgmVolume(a, 0, BGM_TARGET_VOLUME, BGM_FADE_MS);
   }
   function stopBgm(){
-    if(currentBgm && bgmEls[currentBgm]) bgmEls[currentBgm].pause();
+    if(currentBgm && bgmEls[currentBgm]){
+      const a = bgmEls[currentBgm];
+      fadeBgmVolume(a, a.volume, 0, BGM_FADE_MS, ()=> a.pause());
+    }
     currentBgm = null;
   }
   function setMuted(v){
     muted = v;
     localStorage.setItem("quizMuted", v ? "1" : "0");
     if(masterGain) masterGain.gain.value = v ? 0 : 0.5;
-    Object.values(bgmEls).forEach(a=> a.volume = v ? 0 : 0.35);
+    Object.values(bgmEls).forEach(a=> a.volume = v ? 0 : BGM_TARGET_VOLUME);
     if(v) Object.values(bgmEls).forEach(a=> a.pause());
     else if(currentBgm) ensureBgm(currentBgm).play().catch(()=>{});
   }
   function toggleMuted(){ setMuted(!muted); return muted; }
   function unlock(){
     ensureCtx();
+    Object.keys(bgmFiles).forEach(name=> ensureBgm(name)); // preload som, tranh tre khi chuyen man sau nay
     if(!muted && currentBgm) ensureBgm(currentBgm).play().catch(()=>{});
   }
   return { sfx, playBgm, stopBgm, toggleMuted, isMuted:()=>muted, unlock };
@@ -529,10 +563,11 @@ const joinCodeFromUrl = urlParams.get("join");
 
 let state = { screen:"landing", role:null, code:"", hostToken:"", totalQuestions:0, currentIndex:0,
   answered:false, lastCorrect:null, lastPoints:0, correctIndex:null, correctText:"", explanation:"", chosenIndex:null,
-  selectedIcon: ICON_OPTS[0], questionSets:[], playerName:"",
+  selectedIcon: ICON_OPTS[0], questionSets:[], playerName:"", timeIsUp:false,
   resultsStage:"reveal", previousLeaderboard:null, isFirstQuestion:true,
   myResults:null };
-let revealTimer = null, podiumTimer = null;
+let revealTimer = null, podiumTimer = null, autoNextTimer = null;
+function clearAutoNextTimer(){ if(autoNextTimer){ clearTimeout(autoNextTimer); autoNextTimer = null; } }
 // Danh sach nguoi choi trong sanh cho gan nhat (tu socket "lobby:update"), luu lai de khung
 // phong to QR co the hien ngay khi mo, khong can cho su kien tiep theo moi co du lieu.
 let lastLobbyPlayers = [];
@@ -617,7 +652,20 @@ function render(){
   bind();
   if(state.screen==="host_lobby") renderQr();
   if((state.screen==="host_results" || state.screen==="player_results") && state.resultsStage==="leaderboard"){
-    runLeaderboardReveal("leaderboard", state.previousLeaderboard, state.leaderboard, state.isFirstQuestion);
+    runLeaderboardReveal("leaderboard", state.previousLeaderboard, state.leaderboard, state.isFirstQuestion, ()=>{
+      // Chi host moi duoc chu dong chuyen cau (server quyet dinh qua host:next), va chi bat
+      // dau dem 5s SAU KHI animation truot hang da dung han, tranh chuyen cau qua som luc
+      // nguoi choi con dang doc bang xep hang truot len xuong.
+      if(state.role==="host" && state.screen==="host_results" && state.resultsStage==="leaderboard"){
+        clearAutoNextTimer();
+        autoNextTimer = setTimeout(()=>{
+          autoNextTimer = null;
+          socket.emit("host:next");
+        }, 5000);
+      }
+    });
+  } else {
+    clearAutoNextTimer();
   }
   const isHostStage = state.screen==="host_question" || state.screen==="host_results" || state.screen==="host_podium" || state.screen==="host_ended";
   document.body.classList.toggle("host-stage", isHostStage);
@@ -790,12 +838,12 @@ function viewQuestion(isHost){
   </div>
   <div class="qa-question"><div class="question-box"><div class="question-text">${formatRichText(state.question)}</div></div></div>
   <div class="qa-answers"><div class="opts">
-    ${state.options.map((o,i)=>`<button class="opt ${OPT_CLASSES[i]}${optSizeClass(state.options)}" data-choice="${i}" ${isHost||state.answered?"disabled":""} style="${isHost?"cursor:default":""}">${SHAPES[OPT_CLASSES[i]]}<span>${esc(o)}</span></button>`).join("")}
+    ${state.options.map((o,i)=>`<button class="opt ${OPT_CLASSES[i]}${optSizeClass(state.options)}" data-choice="${i}" ${isHost||state.answered||state.timeIsUp?"disabled":""} style="${isHost?"cursor:default":""}">${SHAPES[OPT_CLASSES[i]]}<span>${esc(o)}</span></button>`).join("")}
   </div></div>
   <div class="qa-footer">
   ${isHost
     ? `<div class="divider"></div><p class="muted center" id="answered-count">0 người đã trả lời</p><button class="primary block" id="force-end">Kết thúc câu hỏi ngay</button>`
-    : `<div class="divider"></div><p class="muted center">${state.answered?"Đã gửi đáp án — chờ kết quả…":"Chọn một đáp án"}</p>`}
+    : `<div class="divider"></div><p class="muted center" id="qa-status-msg">${state.answered?"Đã gửi đáp án — chờ kết quả…":(state.timeIsUp?"Hết giờ! Đang chờ kết quả…":"Chọn một đáp án")}</p>`}
   </div>
   </div>`;
 }
@@ -827,11 +875,14 @@ function viewReveal(isHost){
   const isExplain = isHost && !!state.explanation;
   const boxText = isExplain ? state.explanation : state.question;
   const explainTag = isExplain ? `<div class="explain-tag">GIẢI THÍCH</div>` : "";
+  const isLastQuestion = state.currentIndex + 1 >= state.totalQuestions;
   const footer = isHost
-    ? (state.explanation
-        ? `<button class="primary block" id="reveal-next">Xem bảng xếp hạng</button>`
-        : `<p class="muted center">Đáp án đúng…</p>`)
-    : `<p class="muted center">${state.explanation ? "Đang chờ host tiếp tục…" : "Xem đáp án đúng…"}</p>`;
+    ? (isLastQuestion
+        ? `<button class="primary block" id="reveal-next">Kết thúc trò chơi</button>`
+        : (state.explanation
+            ? `<button class="primary block" id="reveal-next">Xem bảng xếp hạng</button>`
+            : `<p class="muted center">Đáp án đúng…</p>`))
+    : `<p class="muted center">${isLastQuestion ? "Đang chờ host kết thúc trò chơi…" : (state.explanation ? "Đang chờ host tiếp tục…" : "Xem đáp án đúng…")}</p>`;
   return `<div class="card qa-card">
   <div class="qmeta">
     <div class="badge badge-dark">Câu ${state.currentIndex+1}/${state.totalQuestions}</div>
@@ -1014,11 +1065,12 @@ function animateNumber(elm, from, to, duration){
 }
 // Animation bang xep hang tu cau thu 2 tro di: hien thu tu CU + diem CU -> cong diem
 // chay dan len -> cac hang truot len/xuong ve dung thu tu MOI (ky thuat FLIP don gian).
-function runLeaderboardReveal(containerId, prevList, newList, isFirst){
+function runLeaderboardReveal(containerId, prevList, newList, isFirst, onComplete){
   const container = el(containerId);
-  if(!container || !newList) return;
+  if(!container || !newList){ if(onComplete) onComplete(); return; }
   if(isFirst || !prevList || prevList.length===0){
     container.innerHTML = renderLeaderboard(newList, null);
+    if(onComplete) onComplete();
     return;
   }
   const prevSorted = prevList.slice().sort((a,b)=>b.score-a.score);
@@ -1030,7 +1082,7 @@ function runLeaderboardReveal(containerId, prevList, newList, isFirst){
       const newP = newList.find(x=>(x.clientId||x.name)===cid);
       const row = container.querySelector(`[data-cid="${CSS.escape(String(cid))}"]`);
       const scoreEl = row ? row.querySelector(".leader-score") : null;
-      if(scoreEl && newP) animateNumber(scoreEl, p.score, newP.score, 1100);
+      if(scoreEl && newP) animateNumber(scoreEl, p.score, newP.score, 650);
     });
 
     setTimeout(()=>{
@@ -1082,7 +1134,8 @@ function runLeaderboardReveal(containerId, prevList, newList, isFirst){
           );
         }
       });
-    }, 1400);
+      if(onComplete) setTimeout(onComplete, 900);
+    }, 900);
   }, 700);
 }
 
@@ -1094,10 +1147,7 @@ function bind(){
   if(unlockEl) unlockEl.onclick = unlockMyQuestionSets;
   b("pick-history", ()=>{ location.href="/history.html"; });
   b("pick-admin", ()=>{ location.href="/admin.html"; });
-  b("back-landing", ()=>{
-    if(state.role==="player"){ resetToPlayerJoin(); }
-    else { location.href = location.pathname; }
-  });
+  b("back-landing", ()=>{ location.href = location.pathname; });
   const brandEl = el("brand-home");
   if(brandEl){
     brandEl.onclick = ()=>{ location.href = location.pathname; };
@@ -1135,8 +1185,11 @@ function bind(){
   });
   b("start-game", ()=> socket.emit("host:start"));
   b("force-end", ()=> socket.emit("host:endQuestion"));
-  b("next-question", ()=> socket.emit("host:next"));
-  b("reveal-next", ()=> socket.emit("host:showLeaderboard"));
+  b("next-question", ()=>{ clearAutoNextTimer(); socket.emit("host:next"); });
+  b("reveal-next", ()=>{
+    const isLastQuestion = state.currentIndex + 1 >= state.totalQuestions;
+    socket.emit(isLastQuestion ? "host:next" : "host:showLeaderboard");
+  });
   b("do-join", ()=>{
     const code=(el("join-code").value||"").trim();
     const name=(el("join-name").value||"").trim();
@@ -1184,6 +1237,14 @@ function startTimerLoop(){
     if(remaining<=0){
       clearInterval(tickHandle);
       Sound.sfx.timeUp();
+      if(!state.timeIsUp){
+        state.timeIsUp = true;
+        if(state.role!=="host" && !state.answered){
+          document.querySelectorAll(".qa-answers .opt").forEach(btn=> btn.disabled = true);
+          const msgEl = el("qa-status-msg");
+          if(msgEl) msgEl.innerText = "Hết giờ! Đang chờ kết quả…";
+        }
+      }
     }
   }, 250);
 }
@@ -1209,6 +1270,7 @@ function applyQuestionData(data){
   state.question = data.question; state.options = data.options;
   state.answered = false; state.lastCorrect = null; state.lastPoints = 0;
   state.correctIndex = null; state.correctText = ""; state.explanation = ""; state.chosenIndex = null;
+  state.timeIsUp = false;
   currentStart = data.startTime; currentDuration = data.duration;
   state.screen = state.role==="host" ? "host_question" : "player_question";
 }
@@ -1225,7 +1287,8 @@ function enterResultsStage(){
     if(state.lastCorrect===true) Sound.sfx.correct();
     else if(state.lastCorrect===false) Sound.sfx.wrong();
   }
-  if(!state.explanation){
+  const isLastQuestion = state.currentIndex + 1 >= state.totalQuestions;
+  if(!state.explanation && !isLastQuestion){
     revealTimer = setTimeout(()=>{
       state.resultsStage = "leaderboard";
       Sound.sfx.leaderboardStinger();
@@ -1250,7 +1313,8 @@ function applyResume(resume, fallbackScreen){
     state.explanation = resume.explanation || ""; state.chosenIndex = resume.chosenIndex;
     state.lastCorrect = resume.lastCorrect; state.lastPoints = resume.lastPoints || 0;
     state.screen = state.role==="host" ? "host_results" : "player_results";
-    if(resume.resultsRevealed){
+    const isLastQuestion = state.currentIndex + 1 >= state.totalQuestions;
+    if(resume.resultsRevealed && !isLastQuestion){
       clearTimeout(revealTimer);
       state.resultsStage = "leaderboard";
     } else {

@@ -449,7 +449,9 @@ function startQuestion(code, idx) {
   });
 
   clearTimeout(room._timer);
-  room._timer = setTimeout(() => endQuestion(code), room.duration + 300);
+  // Buffer nho (thay vi 300ms) de van "vot" duoc dap an gui sat gio do do tre mang, nhung
+  // giam cam giac tre giua luc dong ho client ve 0 va luc man dap an dung hien ra.
+  room._timer = setTimeout(() => endQuestion(code), room.duration + 120);
 }
 
 // Bảng xếp hạng TRƯỚC câu hỏi vừa rồi (dùng điểm đã chụp lại lúc bắt đầu câu hỏi),
