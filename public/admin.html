@@ -87,14 +87,14 @@
     border:2px solid var(--line); transition:transform .12s, box-shadow .12s;}
   .opt-row:hover{transform:translateY(-1px);}
   .opt-row:has(input:checked){box-shadow:0 5px 14px rgba(20,10,50,.18); transform:translateY(-1px);}
-  .opt-row textarea{flex:1; font-family:Arial,sans-serif; background:#fff; border-radius:10px; border-width:2px; border-style:solid;
-    resize:none; overflow:hidden; min-height:40px; line-height:1.35; padding:9px 12px; font-size:15px; color:var(--text);}
-  .opt-row textarea:focus{outline:none; border-color:var(--primary-2);}
+  .opt-row .rich-input{flex:1; font-family:Arial,sans-serif; background:#fff; border-radius:10px; border-width:2px; border-style:solid;
+    min-height:40px; line-height:1.35; padding:9px 12px; font-size:15px; color:var(--text); outline:none;}
+  .opt-row .rich-input:focus{border-color:var(--primary-2);}
   .opt-row input[type=radio]{width:20px; height:20px; flex-shrink:0; cursor:pointer;}
   .opt-row .opt-tag{font-size:16px; font-weight:800; width:24px; text-align:center; flex-shrink:0; font-family:Arial,sans-serif;}
   .explain-field{background:rgba(5,38,153,.06); border:1px dashed rgba(5,38,153,.35); border-radius:12px; padding:12px 14px; margin-top:12px;}
   .explain-field label{color:#052699; margin-bottom:6px;}
-  .explain-field textarea{border-color:rgba(5,38,153,.3); background:#fbfbff;}
+  .explain-field .rich-input{border-color:rgba(5,38,153,.3); background:#fbfbff;}
   .fmt-toolbar{display:flex; gap:6px; margin-bottom:6px;}
   .fmt-btn{border:1px solid rgba(5,38,153,.35); background:#fff; color:#052699; border-radius:6px; width:30px; height:26px;
     font-family:Arial,sans-serif; font-size:13px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0;}
@@ -102,18 +102,19 @@
   .fmt-toolbar-sm{margin:0 0 0 34px; gap:4px;}
   .fmt-btn-xs{width:22px; height:19px; font-size:11px; border-radius:5px; opacity:.75;}
   .fmt-btn-xs:hover{opacity:1;}
-  .opt-preview{flex:1; min-width:0; font-size:12px; color:var(--text-dim); font-family:Arial,sans-serif;
-    padding-left:6px; border-left:1px solid var(--line);}
-  .opt-preview p, .opt-preview ul{margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
-  .opt-preview strong{color:var(--text); font-weight:700;}
-  .opt-preview em, .opt-preview u{color:var(--text);}
   .fmt-btn.fmt-italic{font-style:italic; font-weight:400;}
   .fmt-btn.fmt-underline{text-decoration:underline; font-weight:400;}
-  .explain-preview-label{font-size:11px; font-weight:700; color:var(--text-dim); text-transform:uppercase; letter-spacing:.4px; margin:10px 0 4px;}
-  .explain-preview{background:#fff; border:1px solid var(--line); border-radius:10px; padding:10px 12px; font-family:Arial,sans-serif; font-size:14px; line-height:1.4; color:var(--text);}
-  .explain-preview p{margin:0 0 6px;} .explain-preview p:last-child{margin-bottom:0;}
-  .explain-preview ul{margin:6px 0; padding-left:1.3em;} .explain-preview li{margin:3px 0;}
-  .explain-preview .explain-preview-empty{color:var(--text-dim); font-style:italic;}
+  /* ---- O nhap dinh dang truc tiep (contenteditable) — gop lam 1 voi phan "xem truoc",
+     go toi dau thi chu dam/nghieng/gach chan hien ra ngay toi do, khong can dong preview rieng. ---- */
+  .rich-input{width:100%; border:2px solid var(--line); border-radius:10px; padding:10px 12px; font-size:15px;
+    font-family:Arial,sans-serif; color:var(--text); background:#fff; transition:border-color .12s; outline:none;
+    min-height:40px; line-height:1.4; white-space:pre-wrap; word-break:break-word;}
+  .rich-input:focus{border-color:var(--primary-2);}
+  .rich-input div{min-height:1.4em;}
+  .rich-input ul{margin:4px 0; padding-left:1.3em;}
+  .rich-input li{margin:2px 0;}
+  .rich-input.is-empty:before{content:attr(data-placeholder); color:#9a92c2; pointer-events:none;}
+  .rich-input b, .rich-input strong{font-weight:700;}
 
   #editor-error{color:var(--red); font-size:14px; margin-bottom:10px; display:none; font-family:Arial,sans-serif;}
   .section-divider{height:1px; background:var(--line); margin:20px 0;}
@@ -227,65 +228,94 @@ $("gate-password").addEventListener("keydown", (e)=>{ if(e.key==="Enter") $("gat
 // Da tung nhap dung mat khau tren trinh duyet nay truoc do -> vao thang, khong hoi lai.
 if(getAdminPassword()){ tryEnterAdmin(getAdminPassword()); }
 const esc = (s)=> String(s==null?"":s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+// Chuan hoa hanh vi phim Enter trong cac o contenteditable ve <div> moi dong (thay vi <br>
+// hoac khong thong nhat giua cac trinh duyet), de logic doc/ghi markdown ben duoi du doan
+// duoc cau truc DOM. Bo qua loi neu trinh duyet khong ho tro (execCommand da lac hau nhung
+// van con hoat dong tren moi trinh duyet pho bien hien nay).
+try{ document.execCommand("defaultParagraphSeparator", false, "div"); }catch(e){}
 
-// Giong het formatRichText trong public/index.html — dung de xem truoc dung y het luc choi
-// game se hien nhu the nao (dam/nghieng/gach chan/gach dau dong).
-function formatRichText(raw){
-  const lines = (raw || "").split(/\r?\n/);
+// O nhap gio la contenteditable, hien dinh dang THAT (dam/nghieng/gach chan/gach dau dong)
+// ngay khi go, thay vi textarea tho + 1 dong "xem truoc" rieng ben duoi. Van luu du lieu
+// thanh chuoi markdown-nhe (**dam**, *nghieng*, __gach chan__, "- dau dong") y het truoc day
+// de tuong thich voi formatRichText ben public/index.html (noi hien thi luc choi that).
+
+// Chuyen 1 doan text thuan (da escape) co marker markdown thanh HTML inline (b/i/u).
+// Thu tu ap dung: ** truoc (dam), roi __ (gach chan), roi * (nghieng) — giong het thu tu
+// trong formatRichText cua public/index.html de dam bao 2 ben luon hien nhat quan.
+function inlineMarkdownToHtml(text){
+  let s = esc(text);
+  s = s.replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
+  s = s.replace(/__(.+?)__/g, "<u>$1</u>");
+  s = s.replace(/\*(.+?)\*/g, "<i>$1</i>");
+  return s;
+}
+// Chuyen chuoi markdown-nhe (luu trong state) -> HTML de do vao contenteditable luc render.
+// Moi dong thuong la 1 <div>, cac dong gach dau dong lien tiep duoc gom vao 1 <ul>.
+function markdownToEditableHtml(raw){
+  if(!raw || !raw.trim()) return "";
+  const lines = String(raw).split(/\r?\n/);
   let html = "", inList = false;
   for(const rawLine of lines){
     const line = rawLine.trim();
     const bulletMatch = line.match(/^[-•]\s+(.*)$/);
     if(bulletMatch){
-      if(!inList){ html += `<ul class="rich-list">`; inList = true; }
-      html += `<li>${esc(bulletMatch[1])}</li>`;
+      if(!inList){ html += "<ul>"; inList = true; }
+      html += `<li>${inlineMarkdownToHtml(bulletMatch[1])}</li>`;
     } else {
       if(inList){ html += "</ul>"; inList = false; }
-      if(line) html += `<p>${esc(line)}</p>`;
+      html += `<div>${line ? inlineMarkdownToHtml(line) : "<br>"}</div>`;
     }
   }
   if(inList) html += "</ul>";
-  html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
-  html = html.replace(/__(.+?)__/g, "<u>$1</u>");
-  html = html.replace(/\*(.+?)\*/g, "<em>$1</em>");
-  return html || `<span class="explain-preview-empty">(chưa có nội dung)</span>`;
+  return html;
+}
+// Chieu nguoc lai: doc DOM cua 1 node (b/strong/i/em/u/text/br) va tra ve chuoi markdown-nhe.
+function nodeToMarkdown(node){
+  if(node.nodeType === Node.TEXT_NODE) return node.textContent;
+  if(node.nodeType !== Node.ELEMENT_NODE) return "";
+  const tag = node.tagName;
+  if(tag === "BR") return "\n";
+  const inner = Array.from(node.childNodes).map(nodeToMarkdown).join("");
+  if(tag === "B" || tag === "STRONG") return `**${inner}**`;
+  if(tag === "U") return `__${inner}__`;
+  if(tag === "I" || tag === "EM") return `*${inner}*`;
+  return inner; // the la (span, font...) do dan/paste vao — bo tag, giu noi dung
+}
+function lineNodeToMarkdown(node){
+  return Array.from(node.childNodes).map(nodeToMarkdown).join("");
+}
+// Doc toan bo noi dung hien tai cua 1 o contenteditable va tra ve chuoi markdown-nhe tuong
+// ung, dung de luu vao state moi lan nguoi dung go/dinh dang. Gom cac node inline nam truc
+// tiep o goc (truong hop hiem trinh duyet chua kip boc vao <div>) vao chung 1 dong dang gom.
+function richInputToMarkdown(root){
+  const lines = [];
+  let current = "";
+  const flush = ()=>{ lines.push(current); current = ""; };
+  root.childNodes.forEach(node=>{
+    const isEl = node.nodeType === Node.ELEMENT_NODE;
+    if(isEl && node.tagName === "UL"){
+      if(current) flush();
+      node.querySelectorAll(":scope > li").forEach(li=> lines.push("- " + lineNodeToMarkdown(li)));
+    } else if(isEl && (node.tagName === "DIV" || node.tagName === "P")){
+      if(current) flush();
+      lines.push(lineNodeToMarkdown(node));
+    } else if(isEl && node.tagName === "BR"){
+      flush();
+    } else {
+      current += nodeToMarkdown(node);
+    }
+  });
+  if(current !== "" || lines.length === 0) flush();
+  return lines.join("\n");
 }
 
 function blankQuestion(){
   return { q:"", options:["","","",""], correct:0, explanation:"" };
 }
 
-// Boc vung dang chon trong textarea bang cu phap markdown-lite tuong ung (**dam**, *nghieng*,
-// __gach chan__ — dung cu phap giong voi phan hien thi thuc te trong game, xem formatRichText
-// trong public/index.html). Neu chua chon gi thi dat con tro giua 2 marker de go tiep.
-// Neu vung chon DA duoc boc san bang marker nay roi (bam nham 2 lan) thi bo di thay vi chong
-// them, tranh sinh ra chuoi dau ****** loi nhu bao cao.
-function applyFormatting(ta, fmt){
-  const markers = { bold:"**", italic:"*", underline:"__" };
-  const marker = markers[fmt];
-  if(!marker) return;
-  const start = ta.selectionStart, end = ta.selectionEnd;
-  const val = ta.value;
-  const selected = val.slice(start, end);
-  const mLen = marker.length;
-  const before = val.slice(Math.max(0, start - mLen), start);
-  const after = val.slice(end, end + mLen);
-  if(selected && before === marker && after === marker){
-    ta.value = val.slice(0, start - mLen) + selected + val.slice(end + mLen);
-    ta.focus();
-    ta.selectionStart = start - mLen;
-    ta.selectionEnd = start - mLen + selected.length;
-  } else {
-    ta.value = val.slice(0, start) + marker + selected + marker + val.slice(end);
-    ta.focus();
-    if(selected){
-      ta.selectionStart = start + marker.length;
-      ta.selectionEnd = start + marker.length + selected.length;
-    } else {
-      ta.selectionStart = ta.selectionEnd = start + marker.length;
-    }
-  }
-}
+// Nut B/I/U gio dung document.execCommand truc tiep tren o contenteditable (xem phan
+// gan nut trong renderQuestions) thay vi tu boc marker vao textarea nhu truoc — trinh
+// duyet tu lo dinh dang + toggle bat/tat khi bam lai, khong can code tay nua.
 
 const NAVY = "#052699"; // màu navy lấy từ chữ "V" trong logo
 const OPT_STYLES = [
@@ -385,9 +415,7 @@ function renderQuestions(){
           <button type="button" class="fmt-btn fmt-italic" data-fmt="italic" data-target="q-text-${qi}" title="In nghiêng">I</button>
           <button type="button" class="fmt-btn fmt-underline" data-fmt="underline" data-target="q-text-${qi}" title="Gạch chân">U</button>
         </div>
-        <textarea id="q-text-${qi}" rows="2" placeholder="Nhập nội dung câu hỏi..." data-q-text="${qi}">${esc(q.q)}</textarea>
-        <div class="explain-preview-label">Xem trước</div>
-        <div class="explain-preview" data-preview-text="${qi}">${formatRichText(q.q)}</div>
+        <div id="q-text-${qi}" class="rich-input" contenteditable="true" data-placeholder="Nhập nội dung câu hỏi..." data-q-text="${qi}">${markdownToEditableHtml(q.q)}</div>
       </div>
       ${q.options.map((opt, oi)=>{
         const oc = OPT_STYLES[oi];
@@ -398,13 +426,12 @@ function renderQuestions(){
           <div class="opt-row" style="background:${oc.bg}; border-color:${oc.border}">
             <input type="radio" name="correct-${qi}" ${q.correct===oi?"checked":""} data-q-correct="${qi}" data-opt-index="${oi}" style="accent-color:${oc.solid}">
             <span class="opt-tag" style="color:${oc.solid}">${letter}</span>
-            <textarea id="${optId}" rows="1" placeholder="Nội dung đáp án ${letter}" data-q-opt="${qi}" data-opt-index="${oi}" style="border-color:${oc.border}; background:#fff;">${esc(opt)}</textarea>
+            <div id="${optId}" class="rich-input" contenteditable="true" data-placeholder="Nội dung đáp án ${letter}" data-q-opt="${qi}" data-opt-index="${oi}" style="border-color:${oc.border};">${markdownToEditableHtml(opt)}</div>
           </div>
           <div class="fmt-toolbar fmt-toolbar-sm">
             <button type="button" class="fmt-btn fmt-btn-xs" data-fmt="bold" data-target="${optId}" title="In đậm">B</button>
             <button type="button" class="fmt-btn fmt-btn-xs fmt-italic" data-fmt="italic" data-target="${optId}" title="In nghiêng">I</button>
             <button type="button" class="fmt-btn fmt-btn-xs fmt-underline" data-fmt="underline" data-target="${optId}" title="Gạch chân">U</button>
-            <div class="opt-preview" data-preview-opt="${qi}-${oi}">${formatRichText(opt)}</div>
           </div>
         </div>`;
       }).join("")}
@@ -415,14 +442,10 @@ function renderQuestions(){
           <button type="button" class="fmt-btn fmt-italic" data-fmt="italic" data-target="q-explain-${qi}" title="In nghiêng">I</button>
           <button type="button" class="fmt-btn fmt-underline" data-fmt="underline" data-target="q-explain-${qi}" title="Gạch chân">U</button>
         </div>
-        <textarea id="q-explain-${qi}" rows="2" placeholder="Ví dụ: Hà Nội là thủ đô của Việt Nam từ năm 1010, khi vua Lý Thái Tổ dời đô về Thăng Long..." data-q-explain="${qi}">${esc(q.explanation||"")}</textarea>
-        <div class="explain-preview-label">Xem trước</div>
-        <div class="explain-preview" data-preview="${qi}">${formatRichText(q.explanation||"")}</div>
+        <div id="q-explain-${qi}" class="rich-input" contenteditable="true" data-placeholder="Ví dụ: Hà Nội là thủ đô của Việt Nam từ năm 1010, khi vua Lý Thái Tổ dời đô về Thăng Long..." data-q-explain="${qi}">${markdownToEditableHtml(q.explanation||"")}</div>
       </div>
     </div>`;
   }).join("");
-
-  function autoResize(t){ t.style.height="auto"; t.style.height=(t.scrollHeight+2)+"px"; }
 
   wrap.querySelectorAll("[data-remove-q]").forEach(btn=>{
     btn.onclick = ()=>{
@@ -431,47 +454,46 @@ function renderQuestions(){
       renderQuestions();
     };
   });
-  function updateTextPreview(qi){
-    const box = wrap.querySelector(`[data-preview-text="${qi}"]`);
-    if(box) box.innerHTML = formatRichText(questions[qi].q || "");
+
+  // O contenteditable "rong" ve mat hien thi (vd sau khi xoa het chu) van co the con sot lai
+  // 1 the <br> rong ben trong khien CSS ":empty" khong nhan dung — don het innerHTML that su
+  // rong de placeholder (data-placeholder qua CSS .is-empty) hien ra dung luc.
+  function updatePlaceholderState(el2){
+    if(el2.textContent.trim() === ""){
+      el2.innerHTML = "";
+      el2.classList.add("is-empty");
+    } else {
+      el2.classList.remove("is-empty");
+    }
   }
-  function updateExplainPreview(qi){
-    const box = wrap.querySelector(`[data-preview="${qi}"]`);
-    if(box) box.innerHTML = formatRichText(questions[qi].explanation || "");
+  // Doc lai toan bo noi dung 1 o contenteditable, chuyen ve markdown-nhe va ghi vao dung
+  // cho trong state `questions` (cau hoi / dap an / giai thich) tuy theo data-* gan tren o.
+  function syncRichInput(el2){
+    updatePlaceholderState(el2);
+    const md = richInputToMarkdown(el2);
+    if(el2.dataset.qText !== undefined){
+      questions[Number(el2.dataset.qText)].q = md;
+    } else if(el2.dataset.qExplain !== undefined){
+      questions[Number(el2.dataset.qExplain)].explanation = md;
+    } else if(el2.dataset.qOpt !== undefined){
+      questions[Number(el2.dataset.qOpt)].options[Number(el2.dataset.optIndex)] = md;
+    }
   }
-  wrap.querySelectorAll("[data-q-text]").forEach(t=>{
-    t.oninput = ()=>{
-      const qi = Number(t.dataset.qText);
-      questions[qi].q = t.value;
-      updateTextPreview(qi);
-    };
+  wrap.querySelectorAll(".rich-input").forEach(el2=>{
+    updatePlaceholderState(el2);
+    el2.addEventListener("input", ()=> syncRichInput(el2));
+    el2.addEventListener("blur", ()=> syncRichInput(el2));
   });
-  wrap.querySelectorAll("[data-q-explain]").forEach(t=>{
-    t.oninput = ()=>{
-      const qi = Number(t.dataset.qExplain);
-      questions[qi].explanation = t.value;
-      updateExplainPreview(qi);
-    };
-  });
-  // Nut dinh dang dung chung cho ca 3 loai o (cau hoi, dap an, giai thich) — xac dinh
-  // textarea can tac dong qua id trong data-target, roi phat lai su kien "input" de cac
-  // handler oninput da co san (cap nhat state + preview) tu chay, khong can lap lai logic.
+  // Nut dinh dang dung chung cho ca 3 loai o (cau hoi, dap an, giai thich) — bam la ap dung
+  // dinh dang THAT ngay tren o (dam/nghieng/gach chan hien ra tuc thi, khong con dong "xem
+  // truoc" rieng nua), roi dong bo lai state markdown tu DOM vua doi.
   wrap.querySelectorAll("[data-fmt]").forEach(btn=>{
     btn.onclick = ()=>{
-      const ta = document.getElementById(btn.dataset.target);
-      if(!ta) return;
-      applyFormatting(ta, btn.dataset.fmt);
-      ta.dispatchEvent(new Event("input"));
-    };
-  });
-  wrap.querySelectorAll("[data-q-opt]").forEach(t=>{
-    autoResize(t);
-    t.oninput = ()=>{
-      const qi = Number(t.dataset.qOpt), oi = Number(t.dataset.optIndex);
-      questions[qi].options[oi] = t.value;
-      autoResize(t);
-      const prev = wrap.querySelector(`[data-preview-opt="${qi}-${oi}"]`);
-      if(prev) prev.innerHTML = formatRichText(t.value);
+      const el2 = document.getElementById(btn.dataset.target);
+      if(!el2) return;
+      el2.focus();
+      document.execCommand(btn.dataset.fmt, false, null);
+      syncRichInput(el2);
     };
   });
   wrap.querySelectorAll("[data-q-correct]").forEach(r=>{
