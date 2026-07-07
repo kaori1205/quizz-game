@@ -291,7 +291,7 @@ io.on("connection", (socket) => {
     cb({ ok: true, code, clientId: cid, totalQuestions: room.questions.length, resume: buildResumePayload(room, cid) });
     if (room.phase === "lobby") {
       io.to(code).emit("lobby:update", {
-        players: Object.values(room.players).map((p) => ({ name: p.name, icon: p.icon })),
+        players: Object.entries(room.players).map(([id, p]) => ({ id, name: p.name, icon: p.icon })),
       });
     }
   });
@@ -402,7 +402,7 @@ io.on("connection", (socket) => {
         if (!stillConnected) {
           delete room.players[cid];
           io.to(code).emit("lobby:update", {
-            players: Object.values(room.players).map((p) => ({ name: p.name, icon: p.icon })),
+            players: Object.entries(room.players).map(([id, p]) => ({ id, name: p.name, icon: p.icon })),
           });
         }
       }

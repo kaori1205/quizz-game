@@ -503,6 +503,10 @@ const Sound = (function(){
       chords.forEach((chord,i)=>{ const start = t + i*0.22; chord.forEach(f=> tone(f, start, 0.5, "sawtooth", 0.14)); });
     },
     confettiPop(){ if(muted) return; const t = ensureCtx().currentTime; noiseBurst(t, 0.05, 0.25, 2200); tone(1800, t, 0.08, "sine", 0.2); },
+    // Tieng "ting" ngan, 2 not len cao bao co nguoi moi vao phong cho.
+    playerJoin(){ if(muted) return; const t = ensureCtx().currentTime; tone(784, t, 0.09, "sine", 0.28); tone(1046.5, t+0.07, 0.13, "sine", 0.3); },
+    // Tieng "poop" ngan, 2 not xuong thap bao co nguoi roi phong cho.
+    playerLeave(){ if(muted) return; const t = ensureCtx().currentTime; tone(587.33, t, 0.09, "sine", 0.24); tone(392, t+0.07, 0.15, "sine", 0.26); },
   };
   function playBgm(name){
     if(currentBgm === name) return;
@@ -1257,7 +1261,20 @@ function lobbyCountText(players){
 function lobbyPlayersHtml(players){
   return players.map(p=>`<div class="player-chip"><div class="avatar">${avatarHtml(p.icon, p.name)}</div>${esc(p.name)}</div>`).join("");
 }
+// Dinh danh 1 nguoi choi de so sanh 2 danh sach (uu tien id/clientId server tra ve,
+// fallback ten+icon neu server khong gui id).
+function lobbyPlayerKey(p){ return p.id || p.clientId || (p.name + "|" + p.icon); }
 socket.on("lobby:update", ({players})=>{
+  // Chi phat tieng bao vao/ra khi dang o man hinh sanh cho cua host (nguoi choi khong
+  // can nghe tieng nay), va bo qua lan cap nhat dau tien (luc do "them" toan bo la binh thuong).
+  if(state.role==="host" && state.screen==="host_lobby" && lastLobbyPlayers.length>0){
+    const prevKeys = new Set(lastLobbyPlayers.map(lobbyPlayerKey));
+    const newKeys = new Set(players.map(lobbyPlayerKey));
+    const hasJoined = players.some(p=> !prevKeys.has(lobbyPlayerKey(p)));
+    const hasLeft = lastLobbyPlayers.some(p=> !newKeys.has(lobbyPlayerKey(p)));
+    if(hasJoined) Sound.sfx.playerJoin();
+    else if(hasLeft) Sound.sfx.playerLeave();
+  }
   lastLobbyPlayers = players;
   const c = el("lobby-count"); if(c) c.innerText = lobbyCountText(players);
   const l = el("lobby-players"); if(l) l.innerHTML = lobbyPlayersHtml(players);
@@ -1278,6 +1295,10 @@ function applyQuestionData(data){
 // Sau khi hiện đáp án đúng (reveal): nếu câu KHÔNG có giải thích, tự động chuyển sang bảng
 // xếp hạng sau vài giây như cũ. Nếu câu CÓ giải thích, giữ nguyên màn reveal cho tới khi
 // host chủ động bấm "Xem bảng xếp hạng" (xem socket "results:show").
+// Rieng CAU HOI CUOI (khong giai thich): khong can xem lai bang xep hang giua chung nua vi
+// sap chuyen thang sang podium/ket qua chung cuoc, nen thay vi hien "leaderboard" thi host
+// tu dong bam "Ket thuc tro choi" (host:next) sau cung 1 khoang thoi gian nay - truoc day
+// cho nay bi bo qua hoan toan khien cau hoi cuoi dung im mai cho host bam tay.
 function enterResultsStage(){
   state.resultsStage = "reveal";
   clearTimeout(revealTimer);
@@ -1288,11 +1309,19 @@ function enterResultsStage(){
     else if(state.lastCorrect===false) Sound.sfx.wrong();
   }
   const isLastQuestion = state.currentIndex + 1 >= state.totalQuestions;
-  if(!state.explanation && !isLastQuestion){
+  if(!state.explanation){
     revealTimer = setTimeout(()=>{
-      state.resultsStage = "leaderboard";
-      Sound.sfx.leaderboardStinger();
-      render();
+      // Kiem tra van con dang o dung man hinh/giai doan nay truoc khi hanh dong, tranh
+      // truong hop host da chuyen man hinh khac trong luc cho (vd bam nut tay truoc do).
+      if(state.screen!=="host_results" && state.screen!=="player_results") return;
+      if(state.resultsStage!=="reveal") return;
+      if(isLastQuestion){
+        if(state.role==="host") socket.emit("host:next");
+      } else {
+        state.resultsStage = "leaderboard";
+        Sound.sfx.leaderboardStinger();
+        render();
+      }
     }, 2200);
   }
 }
