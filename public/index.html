@@ -156,6 +156,9 @@
 
   /* ===== Q&A card: question box = 1/3 height (dark blur box), answers = 3/5 height (fills area, each opt = 1/4), footer sized to content pinned at bottom ===== */
   .card.qa-card{display:flex; flex-direction:column; min-height:clamp(420px,70vh,640px);}
+  /* ===== Preview card: chi hien cau hoi, dung CHINH GIUA man hinh (khac voi qa-card dong khung tren dinh) ===== */
+  .card.preview-card{display:flex; flex-direction:column; align-items:center; justify-content:center; gap:22px; min-height:clamp(420px,70vh,640px);}
+  .card.preview-card .question-box{height:auto; max-height:60vh; overflow:auto; width:100%;}
   .qa-question{flex:3 1 0%; display:flex; align-items:stretch; justify-content:center;}
   .question-box{width:100%; height:calc(100% - 20px); margin-bottom:20px; display:flex; align-items:center; justify-content:center; background:rgba(58,45,120,.16); backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px); border:1px solid rgba(255,255,255,.4); border-radius:18px; padding:22px 24px; box-shadow:0 8px 22px rgba(20,10,50,.10), inset 0 1px 0 rgba(255,255,255,.3);}
   .question-box .question-text{width:100%; margin:0; color:#1A1333; text-align:left;}
@@ -205,6 +208,13 @@
   .podium-slot.rank3 .podium-block{height:clamp(46px,9.5vh,80px); background:linear-gradient(180deg,#F0B87E,#C97A3D); font-size:clamp(21px,4.6vw,28px);}
   .podium-crown{width:100%; text-align:center; font-size:clamp(24px,5.6vw,36px); line-height:1; margin-bottom:6px; filter:drop-shadow(0 3px 5px rgba(0,0,0,.28));}
   .podium-waiting{color:rgba(255,255,255,.9); font-weight:700; font-size:clamp(16px,4vw,20px); text-align:center; margin:auto;}
+
+  /* ===== Player: o co dinh o day man hinh hien icon+ten+diem hien tai ===== */
+  .player-score-bar{position:fixed; left:0; right:0; bottom:0; z-index:30; display:flex; align-items:center; gap:12px; background:rgba(36,27,77,.92); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); padding:10px 18px max(10px, env(safe-area-inset-bottom)) 18px; box-shadow:0 -4px 16px rgba(0,0,0,.28);}
+  .player-score-bar .avatar{width:36px; height:36px; font-size:14px; flex-shrink:0; border:2px solid #052699;}
+  .player-score-bar .psb-name{flex:1; min-width:0; font-weight:700; font-size:14px; color:#fff; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .player-score-bar .psb-score{font-family:Arial,sans-serif; font-weight:800; font-size:19px; color:var(--gold); flex-shrink:0;}
+  body.has-score-bar{padding-bottom:78px;}
 
   /* ===== Player: tổng kết cá nhân cuối trận ===== */
   .me-summary{display:flex; align-items:center; gap:14px; background:linear-gradient(135deg,rgba(255,201,60,.22),rgba(139,92,246,.10)); border:1.5px solid rgba(255,201,60,.4); border-radius:16px; padding:16px; margin-bottom:16px;}
@@ -375,12 +385,12 @@
 <script>
 const socket = io();
 const OPT_CLASSES = ["red","blue","yellow","green"];
-const SHAPES = {
-  red:`<span class="opt-logo"><span style="color:var(--a-red)">V</span></span>`,
-  blue:`<span class="opt-logo"><span style="color:var(--a-blue)">V</span></span>`,
-  yellow:`<span class="opt-logo"><span style="color:var(--a-yellow)">V</span></span>`,
-  green:`<span class="opt-logo"><span style="color:var(--a-green)">V</span></span>`,
-};
+const OPT_LETTERS = ["A","B","C","D"];
+const OPT_COLOR_VARS = { red:"var(--a-red)", blue:"var(--a-blue)", yellow:"var(--a-yellow)", green:"var(--a-green)" };
+// O trang + mau nen giu nguyen nhu cu, chi doi ky tu hien thi tu "V" sang A/B/C/D theo vi tri.
+function optLogo(i){
+  return `<span class="opt-logo"><span style="color:${OPT_COLOR_VARS[OPT_CLASSES[i]]}">${OPT_LETTERS[i]}</span></span>`;
+}
 // Anh avatar co san trong public/avt — key la "ma icon" luu trong du lieu nguoi choi,
 // value la ten file thuc te (co doi .webp/.jpg tuy anh).
 const AVT_FILES = {
@@ -574,8 +584,9 @@ let state = { screen:"landing", role:null, code:"", hostToken:"", totalQuestions
   answered:false, lastCorrect:null, lastPoints:0, correctIndex:null, correctText:"", explanation:"", chosenIndex:null,
   selectedIcon: ICON_OPTS[0], questionSets:[], playerName:"", timeIsUp:false,
   resultsStage:"reveal", previousLeaderboard:null, isFirstQuestion:true,
-  myResults:null };
-let revealTimer = null, podiumTimer = null, autoNextTimer = null;
+  myResults:null, iconMode:"choose", myScore:0 };
+let revealTimer = null, podiumTimer = null, autoNextTimer = null, previewTickHandle = null;
+let previewStart = 0, previewDuration = 5000;
 function clearAutoNextTimer(){ if(autoNextTimer){ clearTimeout(autoNextTimer); autoNextTimer = null; } }
 // Danh sach nguoi choi trong sanh cho gan nhat (tu socket "lobby:update"), luu lai de khung
 // phong to QR co the hien ngay khi mo, khong can cho su kien tiep theo moi co du lieu.
@@ -649,12 +660,14 @@ function render(){
   if(state.screen==="landing") app.innerHTML = viewLanding();
   else if(state.screen==="host_setup") app.innerHTML = viewHostSetup();
   else if(state.screen==="host_lobby") app.innerHTML = viewHostLobby();
+  else if(state.screen==="host_question_preview") app.innerHTML = viewQuestionPreview(true);
   else if(state.screen==="host_question") app.innerHTML = viewQuestion(true);
   else if(state.screen==="host_results") app.innerHTML = viewResults(true);
   else if(state.screen==="host_podium") app.innerHTML = viewPodium();
   else if(state.screen==="host_ended") app.innerHTML = viewEnded();
   else if(state.screen==="player_join") app.innerHTML = viewPlayerJoin();
   else if(state.screen==="player_wait") app.innerHTML = viewPlayerWait();
+  else if(state.screen==="player_question_preview") app.innerHTML = viewQuestionPreview(false);
   else if(state.screen==="player_question") app.innerHTML = viewQuestion(false);
   else if(state.screen==="player_results") app.innerHTML = viewResults(false);
   else if(state.screen==="player_ended") app.innerHTML = viewPlayerEnded();
@@ -676,10 +689,12 @@ function render(){
   } else {
     clearAutoNextTimer();
   }
-  const isHostStage = state.screen==="host_question" || state.screen==="host_results" || state.screen==="host_podium" || state.screen==="host_ended";
+  const isHostStage = state.screen==="host_question_preview" || state.screen==="host_question" || state.screen==="host_results" || state.screen==="host_podium" || state.screen==="host_ended";
   document.body.classList.toggle("host-stage", isHostStage);
   document.body.classList.toggle("host-reveal", state.screen==="host_results" && state.resultsStage==="reveal");
   document.body.classList.toggle("lobby-stage", state.screen==="host_lobby");
+  const hasScoreBar = state.role==="player" && ["player_wait","player_question_preview","player_question","player_results"].includes(state.screen);
+  document.body.classList.toggle("has-score-bar", hasScoreBar);
   if((state.screen==="host_results" && state.resultsStage==="leaderboard") || state.screen==="host_ended") startCelebration();
   else clearFx();
   updateBgmForScreen();
@@ -689,7 +704,7 @@ function render(){
 function updateBgmForScreen(){
   const s = state.screen;
   if(s==="host_lobby" || s==="player_wait") Sound.playBgm("lobby");
-  else if(s==="host_question" || s==="player_question") Sound.playBgm("question");
+  else if(s==="host_question_preview" || s==="player_question_preview" || s==="host_question" || s==="player_question") Sound.playBgm("question");
   else if(s==="host_podium") Sound.playBgm("podium");
   else Sound.stopBgm();
 }
@@ -823,6 +838,10 @@ function viewHostSetup(){
         <input type="checkbox" id="opt-shuffle-answers">
         <span>Trộn thứ tự đáp án</span>
       </label>
+      <label class="setting-row">
+        <input type="checkbox" id="opt-random-icon">
+        <span>Chọn icon ngẫu nhiên cho người chơi (bỏ qua bước tự chọn)</span>
+      </label>
     </div>
   </div>
   <button class="primary block" id="create-room">Tạo phòng ngay</button>
@@ -860,13 +879,32 @@ function viewQuestion(isHost){
   </div>
   <div class="qa-question"><div class="question-box"><div class="question-text">${formatRichText(state.question)}</div></div></div>
   <div class="qa-answers"><div class="opts">
-    ${state.options.map((o,i)=>`<button class="opt ${OPT_CLASSES[i]}${optSizeClass(state.options)}" data-choice="${i}" ${isHost||state.answered||state.timeIsUp?"disabled":""} style="${isHost?"cursor:default":""}">${SHAPES[OPT_CLASSES[i]]}<span>${esc(o)}</span></button>`).join("")}
+    ${state.options.map((o,i)=>`<button class="opt ${OPT_CLASSES[i]}${optSizeClass(state.options)}" data-choice="${i}" ${isHost||state.answered||state.timeIsUp?"disabled":""} style="${isHost?"cursor:default":""}">${optLogo(i)}<span>${esc(o)}</span></button>`).join("")}
   </div></div>
   <div class="qa-footer">
   ${isHost
     ? `<div class="divider"></div><p class="muted center" id="answered-count">0 người đã trả lời</p><button class="primary block" id="force-end">Kết thúc câu hỏi ngay</button>`
     : `<div class="divider"></div><p class="muted center" id="qa-status-msg">${state.answered?"Đã gửi đáp án — chờ kết quả…":(state.timeIsUp?"Hết giờ! Đang chờ kết quả…":"Chọn một đáp án")}</p>`}
   </div>
+  </div>${!isHost ? playerScoreBarHtml() : ""}`;
+}
+// Man hinh CHI HIEN CAU HOI (chua co dap an) truoc khi mo cho tra loi ~5s — cau hoi dung
+// giua man hinh (khong dong khung tren dinh nhu luc co dap an). Khi chuyen sang man cau hoi
+// that su, o cau hoi nay se "bay" ve dung vi tri cua no trong layout cau hoi+dap an (xem
+// hieu ung FLIP trong socket "game:question").
+function viewQuestionPreview(isHost){
+  return `<div class="card center preview-card">
+  <div class="badge badge-dark">Câu ${state.currentIndex+1}/${state.totalQuestions}</div>
+  <div class="question-box"><div class="question-text">${formatRichText(state.question)}</div></div>
+  <p class="muted center">Câu trả lời sẽ mở sau <b id="preview-secs">5</b> giây…</p>
+  </div>${!isHost ? playerScoreBarHtml() : ""}`;
+}
+// O co dinh o day man hinh nguoi choi: icon + ten + diem hien tai (chi hien khi la nguoi choi).
+function playerScoreBarHtml(){
+  return `<div class="player-score-bar">
+    <div class="avatar">${avatarHtml(state.selectedIcon, state.playerName)}</div>
+    <div class="psb-name">${esc(state.playerName)}</div>
+    <div class="psb-score" id="psb-score">${state.myScore||0}</div>
   </div>`;
 }
 // Dap an cang dai (nhieu chu, de xuong nhieu dong) thi chu cang nho lai, tranh khung
@@ -887,7 +925,7 @@ function renderRevealOptions(isHost){
     // khong can chuyen sang xanh la nua. Ben nguoi choi van giu mau xanh la nhu cu.
     if(i===state.correctIndex) extra = " reveal-correct" + (isHost ? "" : " reveal-correct-color");
     else if(state.chosenIndex!=null && i===state.chosenIndex) extra = " reveal-wrong";
-    return `<button class="opt ${OPT_CLASSES[i]}${sizeClass}${extra}" disabled>${SHAPES[OPT_CLASSES[i]]}<span>${esc(o)}</span></button>`;
+    return `<button class="opt ${OPT_CLASSES[i]}${sizeClass}${extra}" disabled>${optLogo(i)}<span>${esc(o)}</span></button>`;
   }).join("");
 }
 function viewReveal(isHost){
@@ -916,7 +954,7 @@ function viewReveal(isHost){
   <div class="divider"></div>
   ${footer}
   </div>
-  </div>`;
+  </div>${!isHost ? playerScoreBarHtml() : ""}`;
 }
 function viewLeaderboardStage(isHost){
   return `<div class="card lb-card">
@@ -928,7 +966,7 @@ function viewLeaderboardStage(isHost){
     ? `<button class="primary block" id="next-question">${state.currentIndex+1<state.totalQuestions?"Câu tiếp theo":"Kết thúc trò chơi"}</button>`
     : `<p class="muted center">Đang chờ host chuyển câu tiếp theo…</p>`}
   </div>
-  </div>`;
+  </div>${!isHost ? playerScoreBarHtml() : ""}`;
 }
 function viewResults(isHost){
   return state.resultsStage==="leaderboard" ? viewLeaderboardStage(isHost) : viewReveal(isHost);
@@ -1027,21 +1065,24 @@ function viewPlayerEnded(){
 }
 function viewPlayerJoin(){
   const codeLocked = !!joinCodeFromUrl;
+  const iconSection = state.iconMode==="random"
+    ? ""
+    : `<label>Chọn icon nhân vật</label>
+  <div class="icon-picker" id="icon-picker">
+    ${ICON_OPTS.map(ic=>`<div class="icon-opt ${ic===state.selectedIcon?"active":""}" data-icon="${ic}"><img src="/avt/${AVT_FILES[ic]}" alt=""></div>`).join("")}
+  </div>`;
   return `<div class="card"><h2 style="margin-top:0">Tham gia phòng</h2>
   <label>Mã phòng</label>
   <input id="join-code" placeholder="VD: 1234" maxlength="6" style="margin-bottom:14px" value="${esc(state.code||joinCodeFromUrl||"")}" ${codeLocked?"disabled":""}/>
-  <label>Tên hiển thị</label><input id="join-name" placeholder="Biệt danh của bạn" maxlength="18" style="margin-bottom:16px"/>
-  <label>Chọn icon nhân vật</label>
-  <div class="icon-picker" id="icon-picker">
-    ${ICON_OPTS.map(ic=>`<div class="icon-opt ${ic===state.selectedIcon?"active":""}" data-icon="${ic}"><img src="/avt/${AVT_FILES[ic]}" alt=""></div>`).join("")}
-  </div>
+  <label>Tên hiển thị</label><input id="join-name" placeholder="VD: Nguyễn Văn A - N1" maxlength="18" style="margin-bottom:16px"/>
+  ${iconSection}
   <p class="muted" id="join-error" style="color:#DC2626"></p>
   <button class="primary block" id="do-join">Tham gia ngay</button></div>`;
 }
 function viewPlayerWait(){
   return `<div class="card center"><div class="badge">Đã vào phòng ${state.code}</div>
   <div class="avatar lg" style="margin:18px auto 0">${avatarHtml(state.selectedIcon, state.playerName)}</div>
-  <p class="muted" style="margin-top:14px">Đang chờ host bắt đầu trò chơi…</p></div>`;
+  <p class="muted" style="margin-top:14px">Đã vào phòng! Hãy kiểm tra tên mình trên màn hình lớn</p></div>${playerScoreBarHtml()}`;
 }
 function buildRankMap(list){
   const map = {};
@@ -1201,7 +1242,8 @@ function bind(){
     const questionSetId = sel && sel.value ? sel.value : undefined;
     const shuffleQuestions = !!(el("opt-shuffle-questions") && el("opt-shuffle-questions").checked);
     const shuffleAnswers = !!(el("opt-shuffle-answers") && el("opt-shuffle-answers").checked);
-    socket.emit("host:create", { questionSetId, shuffleQuestions, shuffleAnswers }, (res)=>{
+    const randomIcon = !!(el("opt-random-icon") && el("opt-random-icon").checked);
+    socket.emit("host:create", { questionSetId, shuffleQuestions, shuffleAnswers, randomIcon }, (res)=>{
       if(!res.ok) return;
       state.role="host"; state.code=res.code; state.totalQuestions=res.totalQuestions; state.hostToken=res.hostToken;
       state.screen="host_lobby"; render();
@@ -1223,11 +1265,21 @@ function bind(){
     socket.emit("player:join", {code, name, icon: state.selectedIcon, clientId: getClientId()}, (res)=>{
       if(!res.ok){ err.innerText=res.error; return; }
       state.role="player"; state.code=code; state.totalQuestions=res.totalQuestions;
+      if(res.icon) state.selectedIcon = res.icon;
+      state.myScore = 0;
       applyResume(res.resume, "player_wait");
       render();
       if(state.screen==="player_question") startTimerLoop();
+      if(state.screen==="player_question_preview") startPreviewCountdown();
     });
   });
+  const codeInputEl = el("join-code");
+  if(codeInputEl && !codeInputEl.disabled){
+    codeInputEl.oninput = ()=>{
+      const v = codeInputEl.value.trim();
+      if(v.length===4) checkRoomIconMode(v);
+    };
+  }
   document.querySelectorAll(".opt[data-choice]").forEach(btn=>{
     btn.onclick=()=>{
       if(state.role!=="player" || state.answered) return;
@@ -1239,6 +1291,30 @@ function bind(){
       socket.emit("player:answer", { choice: state.chosenIndex });
     };
   });
+}
+
+// Kiem tra 1 phong dang dung che do chon icon nao (tu chon / ngau nhien), de an/hien
+// buoc chon icon trong form tham gia. Chi goi lai khi ma phong thuc su thay doi.
+let lastIconModeCheckedCode = "";
+function checkRoomIconMode(code){
+  if(!code || code===lastIconModeCheckedCode) return;
+  lastIconModeCheckedCode = code;
+  fetch(`/api/rooms/${code}`).then(r=>r.json()).then(data=>{
+    state.iconMode = (data && data.ok && data.iconMode==="random") ? "random" : "choose";
+    if(state.screen==="player_join") render();
+  }).catch(()=>{});
+}
+
+function startPreviewCountdown(){
+  if(previewTickHandle) clearInterval(previewTickHandle);
+  const tick = ()=>{
+    const remaining = previewStart + previewDuration - Date.now();
+    const secsEl = el("preview-secs");
+    if(secsEl) secsEl.textContent = Math.max(0, Math.ceil(remaining/1000));
+    if(remaining<=0 && previewTickHandle){ clearInterval(previewTickHandle); previewTickHandle=null; }
+  };
+  tick();
+  previewTickHandle = setInterval(tick, 250);
 }
 
 function startTimerLoop(){
@@ -1350,8 +1426,15 @@ function enterResultsStage(){
 // đúng màn hình đang diễn ra thay vì mắc kẹt ở màn hình chờ.
 function applyResume(resume, fallbackScreen){
   if(!resume){ state.screen = fallbackScreen; return; }
-  if(resume.phase === "question"){
+  if(resume.phase === "question_preview"){
+    state.currentIndex = resume.index; state.totalQuestions = resume.total;
+    state.question = resume.question;
+    previewStart = resume.startTime; previewDuration = resume.previewDuration;
+    state.myScore = resume.myScore || 0;
+    state.screen = state.role==="host" ? "host_question_preview" : "player_question_preview";
+  } else if(resume.phase === "question"){
     applyQuestionData(resume);
+    state.myScore = resume.myScore || 0;
   } else if(resume.phase === "results"){
     state.prevRankMap = null;
     state.leaderboard = resume.leaderboard;
@@ -1361,6 +1444,7 @@ function applyResume(resume, fallbackScreen){
     state.correctIndex = resume.correctIndex; state.correctText = resume.correctText;
     state.explanation = resume.explanation || ""; state.chosenIndex = resume.chosenIndex;
     state.lastCorrect = resume.lastCorrect; state.lastPoints = resume.lastPoints || 0;
+    state.myScore = resume.myScore || 0;
     state.screen = state.role==="host" ? "host_results" : "player_results";
     const isLastQuestion = state.currentIndex + 1 >= state.totalQuestions;
     if(resume.resultsRevealed && !isLastQuestion){
@@ -1399,10 +1483,39 @@ socket.on("room:closed", ()=>{
   if(state.role==="player") resetToPlayerJoin();
 });
 
+socket.on("game:questionPreview", (data)=>{
+  state.currentIndex = data.index; state.totalQuestions = data.total;
+  state.question = data.question;
+  previewStart = data.startTime; previewDuration = data.previewDuration;
+  state.screen = state.role==="host" ? "host_question_preview" : "player_question_preview";
+  render();
+  startPreviewCountdown();
+});
+
 socket.on("game:question", (data)=>{
+  // Neu dang o man preview (cau hoi dung giua man hinh), chup lai vi tri cu cua o cau hoi
+  // TRUOC khi render lai, de sau do "bay" no ve dung vi tri trong layout cau hoi+dap an
+  // (ky thuat FLIP: giong cach lam voi bang xep hang truot hang o runLeaderboardReveal).
+  const wasPreview = state.screen==="host_question_preview" || state.screen==="player_question_preview";
+  const oldBox = wasPreview ? document.querySelector(".preview-card .question-box") : null;
+  const firstRect = oldBox ? oldBox.getBoundingClientRect() : null;
   applyQuestionData(data);
   render();
   startTimerLoop();
+  if(firstRect){
+    const newBox = document.querySelector(".qa-question .question-box");
+    if(newBox){
+      const lastRect = newBox.getBoundingClientRect();
+      const dx = (firstRect.left + firstRect.width/2) - (lastRect.left + lastRect.width/2);
+      const dy = (firstRect.top + firstRect.height/2) - (lastRect.top + lastRect.height/2);
+      const scaleX = firstRect.width / lastRect.width;
+      const scaleY = firstRect.height / lastRect.height;
+      newBox.animate(
+        [{ transform: `translate(${dx}px, ${dy}px) scale(${scaleX}, ${scaleY})` }, { transform: "translate(0,0) scale(1,1)" }],
+        { duration: 480, easing: "cubic-bezier(.34,1.2,.64,1)" }
+      );
+    }
+  }
 });
 
 socket.on("answer:ack", ({correct, points})=>{
@@ -1425,6 +1538,16 @@ socket.on("game:results", ({leaderboard, previousLeaderboard, isFirstQuestion, c
   state.screen = state.role==="host" ? "host_results" : "player_results";
   enterResultsStage();
   render();
+  // O diem co dinh: cong diem chay dan tu diem cu -> diem moi (dung lai animateNumber
+  // da co san cho bang xep hang, giu dong bo phong cach animation trong toan bo app).
+  if(state.role==="player"){
+    const myEntry = (leaderboard||[]).find(p=>p.clientId===getClientId());
+    const oldScore = state.myScore || 0;
+    const newScore = myEntry ? myEntry.score : oldScore;
+    state.myScore = newScore;
+    const scoreEl = el("psb-score");
+    if(scoreEl) animateNumber(scoreEl, oldScore, newScore, 650);
+  }
 });
 
 // Host bam "Xem bang xep hang" (chi xay ra khi cau hoi co giai thich) -> ca phong cung
@@ -1463,6 +1586,7 @@ socket.on("connect", ()=>{
       applyResume(res.resume, state.screen);
       render();
       if(state.screen==="player_question") startTimerLoop();
+      if(state.screen==="player_question_preview") startPreviewCountdown();
     });
   } else if(state.role==="host" && state.code && state.hostToken){
     // Socket bi rot tam thoi (mang chap chon, tai cao...) va vua ket noi lai — tu nhan
@@ -1473,6 +1597,7 @@ socket.on("connect", ()=>{
       applyResume(res.resume, state.screen);
       render();
       if(state.screen==="host_question") startTimerLoop();
+      if(state.screen==="host_question_preview") startPreviewCountdown();
     });
   }
 });
@@ -1480,6 +1605,7 @@ socket.on("connect", ()=>{
 if(joinCodeFromUrl){
   state.code = joinCodeFromUrl;
   state.screen = "player_join";
+  checkRoomIconMode(joinCodeFromUrl);
 }
 render();
 </script>

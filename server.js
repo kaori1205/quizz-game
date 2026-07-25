@@ -11,6 +11,9 @@ const io = new Server(server);
 
 const PORT = process.env.PORT || 3000;
 const QUESTION_DURATION = 20000; // 20 giây mỗi câu
+// Thoi gian chi hien CAU HOI (chua co dap an) truoc khi mo cho tra loi, giup nguoi choi
+// doc/nghe cau hoi truoc khi cac o dap an xuat hien.
+const QUESTION_PREVIEW_MS = 5000;
 // Neu socket cua HOST bi rot (mat mang tam thoi, tab bi treo do tai cao...), cho phep
 // ho thoi gian nay de tu ket noi lai truoc khi phong bi xoa va tat ca nguoi choi bi da ra.
 const HOST_DISCONNECT_GRACE_MS = 20000;
@@ -61,7 +64,7 @@ app.get("/api/rooms/:code", (req, res) => {
   const room = rooms[req.params.code];
   if (!room) return res.status(404).json({ ok: false, error: "Không tìm thấy phòng với mã này." });
   if (room.phase !== "lobby") return res.json({ ok: false, error: "Phòng đã bắt đầu chơi, không thể vào lúc này." });
-  res.json({ ok: true, code: req.params.code });
+  res.json({ ok: true, code: req.params.code, iconMode: room.iconMode || "choose" });
 });
 
 // ---- API: xac thuc mat khau admin (dung de mo khoa trang quan ly + dropdown tao phong) ----
@@ -196,6 +199,18 @@ function prepareQuestions(sourceQuestions, shuffleQuestions, shuffleAnswers) {
 
 // Trạng thái hiện tại của phòng để 1 client vừa (re)connect bắt kịp đúng màn hình
 function buildResumePayload(room, clientId) {
+  const myScore = clientId && room.players[clientId] ? room.players[clientId].score : 0;
+  if (room.phase === "question_preview") {
+    return {
+      phase: "question_preview",
+      index: room.currentIndex,
+      total: room.questions.length,
+      question: room.questions[room.currentIndex].q,
+      previewDuration: QUESTION_PREVIEW_MS,
+      startTime: room.previewStartTime,
+      myScore,
+    };
+  }
   if (room.phase === "question") {
     return {
       phase: "question",
@@ -205,6 +220,7 @@ function buildResumePayload(room, clientId) {
       options: room.questions[room.currentIndex].options,
       duration: room.duration,
       startTime: room.phaseStartTime,
+      myScore,
     };
   }
   if (room.phase === "results") {
@@ -224,6 +240,7 @@ function buildResumePayload(room, clientId) {
       chosenIndex: myAnswer ? myAnswer.choice : null,
       lastCorrect: myAnswer ? myAnswer.correct : null,
       lastPoints: myAnswer ? myAnswer.points : 0,
+      myScore,
     };
   }
   if (room.phase === "ended") {
@@ -244,6 +261,7 @@ io.on("connection", (socket) => {
     const questionSetId = payload && payload.questionSetId;
     const shuffleQuestions = !!(payload && payload.shuffleQuestions);
     const shuffleAnswers = !!(payload && payload.shuffleAnswers);
+    const randomIcon = !!(payload && payload.randomIcon);
     let code;
     do { code = genCode(); } while (rooms[code]);
 
@@ -268,6 +286,7 @@ io.on("connection", (socket) => {
       hostSocketId: socket.id,
       hostToken,
       hostDisconnectTimer: null,
+      iconMode: randomIcon ? "random" : "choose",
       players: {},
       answers: {},
       socketToClient: {},
@@ -305,7 +324,16 @@ io.on("connection", (socket) => {
       return cb({ ok: false, error: "Phòng đã bắt đầu chơi, không thể vào lúc này." });
     }
 
-    const safeIcon = VALID_ICONS.includes(icon) ? icon : (name || "?").slice(0, 1).toUpperCase();
+    // Che do icon ngau nhien: chi random 1 LAN duy nhat luc vao phong dau tien, khong random
+    // lai moi lan rejoin (tranh avatar bi doi lien tuc khi mat mang/tai lai trang).
+    let safeIcon;
+    if (isRejoin) {
+      safeIcon = room.iconMode === "random" ? room.players[cid].icon : (VALID_ICONS.includes(icon) ? icon : room.players[cid].icon);
+    } else if (room.iconMode === "random") {
+      safeIcon = VALID_ICONS[Math.floor(Math.random() * VALID_ICONS.length)];
+    } else {
+      safeIcon = VALID_ICONS.includes(icon) ? icon : (name || "?").slice(0, 1).toUpperCase();
+    }
     if (isRejoin) {
       // Giữ nguyên điểm số đã có, chỉ cập nhật lại tên/icon nếu đổi
       room.players[cid].name = name.slice(0, 20) || room.players[cid].name;
@@ -319,7 +347,7 @@ io.on("connection", (socket) => {
     socket.data.roomCode = code;
     socket.data.clientId = cid;
 
-    cb({ ok: true, code, clientId: cid, totalQuestions: room.questions.length, resume: buildResumePayload(room, cid) });
+    cb({ ok: true, code, clientId: cid, icon: safeIcon, totalQuestions: room.questions.length, resume: buildResumePayload(room, cid) });
     if (room.phase === "lobby") {
       io.to(code).emit("lobby:update", {
         players: Object.entries(room.players).map(([id, p]) => ({ id, name: p.name, icon: p.icon })),
@@ -448,6 +476,7 @@ io.on("connection", (socket) => {
         const stillRoom = rooms[code];
         if (!stillRoom || stillRoom.hostSocketId) return; // host da ket noi lai truoc do
         clearTimeout(stillRoom._timer);
+        clearTimeout(stillRoom._previewTimer);
         io.to(code).emit("room:closed");
         delete rooms[code];
       }, HOST_DISCONNECT_GRACE_MS);
@@ -455,19 +484,40 @@ io.on("connection", (socket) => {
   });
 });
 
+// Buoc 1: chi hien CAU HOI (chua co dap an) trong QUESTION_PREVIEW_MS, cho nguoi choi
+// doc/nghe cau hoi truoc. Sau khoang thoi gian nay se tu dong chuyen sang buoc 2 (mo dap an).
 function startQuestion(code, idx) {
   const room = rooms[code];
   if (!room) return;
   room.currentIndex = idx;
-  room.phase = "question";
-  room.phaseStartTime = Date.now();
+  room.phase = "question_preview";
+  room.previewStartTime = Date.now();
   room.answers[idx] = {};
   // Chụp lại điểm số của mọi người NGAY TRƯỚC câu hỏi này, để sau khi kết thúc có thể
   // animate phần điểm vừa cộng thêm (từ điểm cũ -> điểm mới) trên bảng xếp hạng.
   room.scoresBeforeQuestion = {};
   for (const [cid, p] of Object.entries(room.players)) room.scoresBeforeQuestion[cid] = p.score;
-  if (!room.startedAt) room.startedAt = room.phaseStartTime;
+  if (!room.startedAt) room.startedAt = room.previewStartTime;
   if (!room.questionStartTimes) room.questionStartTimes = {};
+
+  io.to(code).emit("game:questionPreview", {
+    index: idx,
+    total: room.questions.length,
+    question: room.questions[idx].q,
+    previewDuration: QUESTION_PREVIEW_MS,
+    startTime: room.previewStartTime,
+  });
+
+  clearTimeout(room._previewTimer);
+  room._previewTimer = setTimeout(() => beginAnswerPhase(code, idx), QUESTION_PREVIEW_MS);
+}
+
+// Buoc 2: mo dap an that su + bat dau dong ho dem nguoc de tra loi.
+function beginAnswerPhase(code, idx) {
+  const room = rooms[code];
+  if (!room || room.phase !== "question_preview" || room.currentIndex !== idx) return;
+  room.phase = "question";
+  room.phaseStartTime = Date.now();
   room.questionStartTimes[idx] = room.phaseStartTime;
 
   io.to(code).emit("game:question", {
