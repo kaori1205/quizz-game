@@ -189,6 +189,29 @@
     </div>
   </div>
 
+  <!-- ===== MODAL: tao link tao phong (khoa vao 1 bo cau hoi, tu dong tao phong khi mo) ===== -->
+  <div id="link-modal-overlay" style="display:none; position:fixed; inset:0; background:rgba(20,10,50,.6); z-index:50; align-items:center; justify-content:center; padding:20px;">
+    <div class="card" style="max-width:380px; width:100%;">
+      <h2 style="margin-top:0">Tạo link tạo phòng</h2>
+      <p class="muted" style="margin-top:-6px">Người mở link này sẽ được tự động tạo phòng ngay với cài đặt bên dưới — không cần mật khẩu, không thấy các bộ câu hỏi khác.</p>
+      <div class="field" style="text-align:left;">
+        <label style="display:flex; align-items:center; gap:10px; font-weight:400; cursor:pointer; margin-bottom:10px;">
+          <input type="checkbox" id="link-opt-sq" style="width:18px; height:18px;"> Trộn thứ tự câu hỏi
+        </label>
+        <label style="display:flex; align-items:center; gap:10px; font-weight:400; cursor:pointer; margin-bottom:10px;">
+          <input type="checkbox" id="link-opt-sa" style="width:18px; height:18px;"> Trộn thứ tự đáp án
+        </label>
+        <label style="display:flex; align-items:center; gap:10px; font-weight:400; cursor:pointer;">
+          <input type="checkbox" id="link-opt-ri" style="width:18px; height:18px;"> Chọn icon ngẫu nhiên cho người chơi
+        </label>
+      </div>
+      <div class="editor-footer">
+        <button class="btn primary" id="link-modal-generate">Tạo & copy link</button>
+        <button class="btn secondary" id="link-modal-cancel">Huỷ</button>
+      </div>
+    </div>
+  </div>
+
 <script>
 const API = "/api/question-sets";
 let sets = [];
@@ -349,6 +372,7 @@ function renderList(){
       <div class="set-actions">
         <button class="btn small secondary" data-act="edit" data-id="${s.id}">Sửa</button>
         <button class="btn small secondary" data-act="dup" data-id="${s.id}">Nhân bản</button>
+        <button class="btn small secondary" data-act="link" data-id="${s.id}">🔗 Link tạo phòng</button>
         <button class="btn small danger" data-act="del" data-id="${s.id}">Xoá</button>
       </div>
     </div>`).join("");
@@ -358,7 +382,44 @@ function renderList(){
   });
 }
 
+// Link giao cho nguoi khac (vd nguoi ho tro tai lop hoc) de ho TAO PHONG + DIEU KHIEN duoc
+// dung 1 bo cau hoi nay, khong can mat khau admin, khong thay/dung duoc cac bo khac. Cai dat
+// (tron cau hoi/dap an, icon ngau nhien) duoc chon san trong modal va ma hoa vao link — mo
+// link la tu dong tao phong ngay voi dung cai dat do, khong can bam gi them.
+let linkModalSetId = null;
+function openLinkModal(id){
+  linkModalSetId = id;
+  $("link-opt-sq").checked = false;
+  $("link-opt-sa").checked = false;
+  $("link-opt-ri").checked = false;
+  $("link-modal-overlay").style.display = "flex";
+}
+function closeLinkModal(){
+  linkModalSetId = null;
+  $("link-modal-overlay").style.display = "none";
+}
+async function generateAndCopyLink(){
+  if(!linkModalSetId) return;
+  const sq = $("link-opt-sq").checked ? "1" : "0";
+  const sa = $("link-opt-sa").checked ? "1" : "0";
+  const ri = $("link-opt-ri").checked ? "1" : "0";
+  const link = `${location.origin}/?hostSet=${linkModalSetId}&sq=${sq}&sa=${sa}&ri=${ri}`;
+  try{
+    await navigator.clipboard.writeText(link);
+    alert("Đã copy link vào bộ nhớ tạm:\n" + link);
+  }catch(e){
+    prompt("Copy link này gửi cho người hỗ trợ:", link);
+  }
+  closeLinkModal();
+}
+$("link-modal-generate").onclick = generateAndCopyLink;
+$("link-modal-cancel").onclick = closeLinkModal;
+$("link-modal-overlay").onclick = (e)=>{ if(e.target.id==="link-modal-overlay") closeLinkModal(); };
+
 async function handleListAction(act, id){
+  if(act==="link"){
+    return openLinkModal(id);
+  }
   if(act==="edit"){
     const res = await adminFetch(`${API}/${id}`);
     if(!res.ok) return alert("Không tìm thấy bộ câu hỏi.");

@@ -23,8 +23,10 @@ const HOST_DISCONNECT_GRACE_MS = 20000;
 // Dat bien moi truong ADMIN_PASSWORD (trong .env khi chay local, va trong cai dat cua dich vu
 // tren Render khi trien khai that) — neu de trong thi coi nhu tinh nang nay tat (giong truoc day).
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "";
+// Chap nhan mat khau qua header (fetch() tu client) HOAC qua query string ?pw=... (dung cho
+// link tai file CSV — the <a href> khong gui kem duoc custom header).
 function isAdminRequest(req) {
-  return !!ADMIN_PASSWORD && req.get("x-admin-password") === ADMIN_PASSWORD;
+  return !!ADMIN_PASSWORD && (req.get("x-admin-password") === ADMIN_PASSWORD || req.query.pw === ADMIN_PASSWORD);
 }
 
 // Danh sách icon avatar hợp lệ (ứng với ảnh trong public/avt) — dùng để kiểm tra
@@ -44,17 +46,22 @@ app.use(express.static(path.join(__dirname, "public")));
 app.use(express.json());
 
 // ---- API: lịch sử trận đấu & báo cáo ----
+// Dung chung mat khau admin voi bo cau hoi (nhap 1 lan tren trinh duyet la mo duoc ca hai,
+// vi ca 2 trang deu doc/ghi cung 1 key "quizAdminPassword" trong localStorage).
 app.get("/api/games", async (req, res) => {
+  if (!isAdminRequest(req)) return res.status(401).json({ error: "Cần mật khẩu admin." });
   res.json(await db.listGames());
 });
 
 app.get("/api/games/:id/detail", async (req, res) => {
+  if (!isAdminRequest(req)) return res.status(401).json({ error: "Cần mật khẩu admin." });
   const g = await db.getGame(req.params.id);
   if (!g) return res.status(404).json({ error: "Không tìm thấy trận đấu." });
   res.json(g);
 });
 
 app.delete("/api/games/:id", async (req, res) => {
+  if (!isAdminRequest(req)) return res.status(401).json({ error: "Cần mật khẩu admin." });
   const ok = await db.deleteGame(req.params.id);
   if (!ok) return res.status(404).json({ error: "Không tìm thấy trận đấu." });
   res.json({ ok: true });
@@ -89,6 +96,16 @@ app.get("/api/question-sets/:id", async (req, res) => {
   res.json(set);
 });
 
+// Endpoint CONG KHAI (khong can mat khau admin) — chi tra ve thong tin AN TOAN de hien thi
+// (ten, so cau, thoi luong), KHONG bao gio tra ve noi dung cau hoi/dap an. Dung cho link
+// "tao phong voi 1 bo cau hoi cu the" chia se cho nguoi khac (vd: nguoi ho tro tai lop hoc)
+// ma khong can cap mat khau admin cho ho, va ho cung khong thay duoc cac bo cau hoi khac.
+app.get("/api/question-sets/:id/info", async (req, res) => {
+  const set = await db.getQuestionSet(req.params.id);
+  if (!set) return res.status(404).json({ error: "Không tìm thấy bộ câu hỏi." });
+  res.json({ id: set.id, name: set.name, duration: set.duration, numQuestions: (set.questions || []).length });
+});
+
 app.post("/api/question-sets", async (req, res) => {
   if (!isAdminRequest(req)) return res.status(401).json({ error: "Cần mật khẩu admin." });
   const { name, duration, questions } = req.body || {};
@@ -113,6 +130,7 @@ app.delete("/api/question-sets/:id", async (req, res) => {
 });
 
 app.get("/api/games/:id/report.csv", async (req, res) => {
+  if (!isAdminRequest(req)) return res.status(401).send("Cần mật khẩu admin.");
   const g = await db.getGame(req.params.id);
   if (!g) return res.status(404).send("Không tìm thấy trận đấu.");
   const csv = buildCsvReport(g);

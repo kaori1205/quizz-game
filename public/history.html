@@ -44,6 +44,8 @@
   .link-btn:hover{background:rgba(255,255,255,.28); transform:translateY(-2px);}
   .card{background:var(--panel); border-radius:22px; padding:24px; box-shadow:0 24px 60px rgba(30,10,60,.32);}
   .muted{color:var(--text-dim); font-size:14px;}
+  .field{margin-bottom:16px;}
+  #gate-error{color:var(--red); font-size:14px; margin-top:10px; display:none;}
 
   .btn{border:none; border-radius:12px; padding:10px 16px; font-weight:700; font-size:14px; cursor:pointer;
     font-family:Arial,sans-serif; transition:transform .12s, box-shadow .12s; text-decoration:none; display:inline-block;}
@@ -98,7 +100,17 @@
     <div class="logo"><img src="logo.jpg" alt="Live!QUIZZ logo" onerror="this.style.display='none'"></div>
     <span class="title" aria-label="Live!QUIZZ"><span class="letter">L</span><span class="letter">i</span><span class="letter">v</span><span class="letter">e</span><span class="letter bang">!</span><span class="letter">Q</span><span class="letter">U</span><span class="letter">I</span><span class="letter">Z</span><span class="letter">Z</span></span>
   </a>
-  <div id="wrap">
+  <!-- ===== MAT KHAU GATE: dung chung mat khau + localStorage voi admin.html ===== -->
+  <div class="card center" id="view-gate" style="max-width:380px; width:100%;">
+    <h2 style="margin-top:0">Nhập mật khẩu quản trị</h2>
+    <p class="muted">Trang này chỉ dành cho quản trị viên. Nhập mật khẩu để tiếp tục.</p>
+    <div class="field" style="text-align:left;">
+      <input type="password" id="gate-password" placeholder="Mật khẩu admin" style="width:100%; border:2px solid var(--line); border-radius:10px; padding:10px 12px; font-size:15px; font-family:Arial,sans-serif; box-sizing:border-box;">
+    </div>
+    <button class="btn primary" id="gate-submit" style="width:100%">Xem lịch sử</button>
+    <div id="gate-error"></div>
+  </div>
+  <div id="wrap" style="display:none">
     <div class="top-bar">
       <h1>Lịch sử trận đấu</h1>
       <a class="link-btn" href="/">← Về trang chủ</a>
@@ -107,8 +119,36 @@
   </div>
 
 <script>
+const $ = (id)=>document.getElementById(id);
+function getAdminPassword(){ return localStorage.getItem("quizAdminPassword") || ""; }
+function setAdminPassword(pw){ localStorage.setItem("quizAdminPassword", pw); }
+function adminFetch(url, opts){
+  opts = opts || {};
+  opts.headers = Object.assign({}, opts.headers, { "x-admin-password": getAdminPassword() });
+  return fetch(url, opts);
+}
+async function tryEnterAdmin(password){
+  const res = await fetch("/api/admin/verify", {
+    method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({password}),
+  });
+  if(!res.ok) return false;
+  setAdminPassword(password);
+  $("view-gate").style.display = "none";
+  $("wrap").style.display = "block";
+  load();
+  return true;
+}
+$("gate-submit").onclick = async ()=>{
+  const pw = $("gate-password").value;
+  const errBox = $("gate-error");
+  const ok = await tryEnterAdmin(pw);
+  if(!ok){ errBox.innerText = "Sai mật khẩu, vui lòng thử lại."; errBox.style.display = "block"; }
+};
+$("gate-password").addEventListener("keydown", (e)=>{ if(e.key==="Enter") $("gate-submit").click(); });
+if(getAdminPassword()){ tryEnterAdmin(getAdminPassword()); }
+
 async function load(){
-  const res = await fetch('/api/games');
+  const res = await adminFetch('/api/games');
   const games = await res.json();
   const card = document.getElementById('list-card');
   if(!games.length){
@@ -133,7 +173,7 @@ function rowHtml(g){
     </div>
     <div class="actions">
       <button class="btn secondary small" id="toggle-${g.id}">Xem chi tiết</button>
-      <a class="btn gold small" href="/api/games/${g.id}/report.csv">Tải CSV</a>
+      <a class="btn gold small" href="/api/games/${g.id}/report.csv?pw=${encodeURIComponent(getAdminPassword())}">Tải CSV</a>
       <button class="btn danger small" id="del-${g.id}">Xoá</button>
     </div>
   </div>
@@ -147,14 +187,14 @@ async function toggleDetail(id){
   if(isOpen){ box.classList.remove('open'); box.innerHTML=''; return; }
   box.innerHTML = '<p class="muted">Đang tải chi tiết…</p>';
   box.classList.add('open');
-  const res = await fetch(`/api/games/${id}/detail`);
+  const res = await adminFetch(`/api/games/${id}/detail`);
   const g = await res.json();
   box.innerHTML = detailHtml(g);
 }
 
 async function deleteGame(id){
   if(!confirm('Xoá lịch sử trận đấu này? Không thể hoàn tác.')) return;
-  const res = await fetch(`/api/games/${id}`, { method:'DELETE' });
+  const res = await adminFetch(`/api/games/${id}`, { method:'DELETE' });
   if(res.ok) load();
   else alert('Xoá thất bại, vui lòng thử lại.');
 }
@@ -180,8 +220,6 @@ function detailHtml(g){
 }
 
 function escapeHtml(s){ const d=document.createElement('div'); d.innerText=s==null?'':s; return d.innerHTML; }
-
-load();
 </script>
 </body>
 </html>

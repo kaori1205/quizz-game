@@ -579,12 +579,22 @@ document.addEventListener("fullscreenchange", ()=>{
 
 const urlParams = new URLSearchParams(location.search);
 const joinCodeFromUrl = urlParams.get("join");
+// Link "tao phong voi 1 bo cau hoi cu the" — dung de giao cho nguoi ho tro (vd tai lop hoc)
+// ma khong can cap mat khau admin: mo link la TU DONG tao phong + vao thang sanh cho voi
+// cai dat da duoc chon san (xem them startAutoHostFlow()/autoCreateLockedRoom() ben duoi).
+const hostSetFromUrl = urlParams.get("hostSet");
+const lockedAutoSettings = {
+  sq: urlParams.get("sq") === "1",
+  sa: urlParams.get("sa") === "1",
+  ri: urlParams.get("ri") === "1",
+};
 
 let state = { screen:"landing", role:null, code:"", hostToken:"", totalQuestions:0, currentIndex:0,
   answered:false, lastCorrect:null, lastPoints:0, correctIndex:null, correctText:"", explanation:"", chosenIndex:null,
   selectedIcon: ICON_OPTS[0], questionSets:[], playerName:"", timeIsUp:false,
   resultsStage:"reveal", previousLeaderboard:null, isFirstQuestion:true,
-  myResults:null, iconMode:"choose", myScore:0 };
+  myResults:null, iconMode:"choose", myScore:0,
+  lockedSetId: hostSetFromUrl || null, lockedSetInfo: null };
 let revealTimer = null, podiumTimer = null, autoNextTimer = null, previewTickHandle = null;
 let previewStart = 0, previewDuration = 5000;
 function clearAutoNextTimer(){ if(autoNextTimer){ clearTimeout(autoNextTimer); autoNextTimer = null; } }
@@ -614,6 +624,30 @@ function loadQuestionSets(){
       if(state.screen==="host_setup") render();
     })
     .catch(()=>{ /* giữ danh sách rỗng, vẫn dùng được bộ mặc định */ });
+}
+// Link "?hostSet=..." — kiem tra bo cau hoi co ton tai khong (endpoint nay khong can mat
+// khau admin, chi tra ve thong tin AN TOAN de hien thi), roi TU DONG tao phong ngay, khong
+// can nguoi mo link bam nut gi ca. Kiem tra truoc bang /info thay vi de host:create tu am
+// tham lang roi ve "Bo mac dinh" khi id sai — nhu vay se bao loi ro rang neu link het hieu luc.
+function startAutoHostFlow(){
+  state.screen = "host_setup";
+  render();
+  fetch(`/api/question-sets/${state.lockedSetId}/info`)
+    .then(r=>{ if(!r.ok) throw new Error("not found"); return r.json(); })
+    .then(info=>{ state.lockedSetInfo = info; autoCreateLockedRoom(); })
+    .catch(()=>{ state.lockedSetInfo = { error:true }; render(); });
+}
+function autoCreateLockedRoom(){
+  socket.emit("host:create", {
+    questionSetId: state.lockedSetId,
+    shuffleQuestions: lockedAutoSettings.sq,
+    shuffleAnswers: lockedAutoSettings.sa,
+    randomIcon: lockedAutoSettings.ri,
+  }, (res)=>{
+    if(!res.ok){ state.lockedSetInfo = { error:true }; render(); return; }
+    state.role="host"; state.code=res.code; state.totalQuestions=res.totalQuestions; state.hostToken=res.hostToken;
+    state.screen="host_lobby"; render();
+  });
 }
 function unlockMyQuestionSets(){
   const pw = prompt("Nhập mật khẩu admin để xem bộ câu hỏi của bạn:");
@@ -814,6 +848,7 @@ function viewLanding(){
   </div>`;
 }
 function viewHostSetup(){
+  if(state.lockedSetId) return viewHostSetupLocked();
   const sets = state.questionSets || [];
   const options = [`<option value="">Bộ mặc định (5 câu, 20s/câu)</option>`]
     .concat(sets.map(s=>`<option value="${s.id}">${esc(s.name)} — ${s.numQuestions} câu, ${s.duration}s/câu</option>`))
@@ -827,7 +862,26 @@ function viewHostSetup(){
     </div>
     <select id="question-set-select" style="width:100%; border:1px solid var(--line); border-radius:10px; padding:10px 12px; font-size:15px; font-family:Arial,sans-serif; color:var(--text); background:#fff;">${options}</select>
   </div>
-  <div class="field" style="text-align:left; margin:16px 0;">
+  ${hostSetupSettingsHtml()}
+  <button class="primary block" id="create-room">Tạo phòng ngay</button>
+  <button class="secondary block" id="back-landing" style="margin-top:10px">Về trang chủ</button>
+  </div>`;
+}
+// Man hinh cho link "?hostSet=..." — KHONG con form/nut bam nua, chi hien trang thai dang
+// tao phong (tu dong) hoac loi neu bo cau hoi khong ton tai. Xem startAutoHostFlow().
+function viewHostSetupLocked(){
+  const info = state.lockedSetInfo;
+  if(info && info.error){
+    return `<div class="card center"><h2 style="margin-top:0">Không thể tạo phòng</h2>
+    <p class="muted" style="color:#DC2626">Không tìm thấy bộ câu hỏi — link có thể không còn hợp lệ. Liên hệ người đã gửi link này cho bạn.</p>
+    </div>`;
+  }
+  return `<div class="card center"><h2 style="margin-top:0">Đang tạo phòng…</h2>
+  ${info ? `<p class="muted">Bộ câu hỏi: <b>${esc(info.name)}</b></p>` : `<p class="muted">Đang tải…</p>`}
+  </div>`;
+}
+function hostSetupSettingsHtml(){
+  return `<div class="field" style="text-align:left; margin:16px 0;">
     <label style="display:block; margin-bottom:8px;">Cài đặt</label>
     <div class="setting-list">
       <label class="setting-row">
@@ -843,9 +897,6 @@ function viewHostSetup(){
         <span>Chọn icon ngẫu nhiên cho người chơi (bỏ qua bước tự chọn)</span>
       </label>
     </div>
-  </div>
-  <button class="primary block" id="create-room">Tạo phòng ngay</button>
-  <button class="secondary block" id="back-landing" style="margin-top:10px">Về trang chủ</button>
   </div>`;
 }
 function viewHostLobby(){
@@ -1239,7 +1290,7 @@ function bind(){
   });
   b("create-room", ()=>{
     const sel = el("question-set-select");
-    const questionSetId = sel && sel.value ? sel.value : undefined;
+    const questionSetId = state.lockedSetId || (sel && sel.value ? sel.value : undefined);
     const shuffleQuestions = !!(el("opt-shuffle-questions") && el("opt-shuffle-questions").checked);
     const shuffleAnswers = !!(el("opt-shuffle-answers") && el("opt-shuffle-answers").checked);
     const randomIcon = !!(el("opt-random-icon") && el("opt-random-icon").checked);
@@ -1606,6 +1657,8 @@ if(joinCodeFromUrl){
   state.code = joinCodeFromUrl;
   state.screen = "player_join";
   checkRoomIconMode(joinCodeFromUrl);
+} else if(hostSetFromUrl){
+  startAutoHostFlow();
 }
 render();
 </script>
