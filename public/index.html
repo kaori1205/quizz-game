@@ -158,7 +158,12 @@
   .card.qa-card{display:flex; flex-direction:column; min-height:clamp(420px,70vh,640px);}
   /* ===== Preview card: chi hien cau hoi, dung CHINH GIUA man hinh (khac voi qa-card dong khung tren dinh) ===== */
   .card.preview-card{display:flex; flex-direction:column; align-items:center; justify-content:center; gap:22px; min-height:clamp(420px,70vh,640px);}
-  .card.preview-card .question-box{height:auto; max-height:60vh; overflow:auto; width:100%;}
+  .card.preview-card .question-box{height:auto; max-height:60vh; overflow:auto; width:100%; position:relative;}
+  /* Line chay doc vien duoi o cau hoi, bieu thi thoi gian dem nguoc xem truoc — dung
+     transform:scaleX (khong dung width) de tron va khong lam giat layout. */
+  .preview-timebar{position:absolute; left:0; bottom:0; width:100%; height:4px; border-radius:0 0 18px 18px; background:var(--gold); transform-origin:left center; animation-name:previewTimebarShrink; animation-timing-function:linear; animation-fill-mode:forwards;}
+  @keyframes previewTimebarShrink{ from{transform:scaleX(1);} to{transform:scaleX(0);} }
+  @media (prefers-reduced-motion:reduce){ .preview-timebar{animation:none; opacity:0;} }
   .qa-question{flex:3 1 0%; display:flex; align-items:stretch; justify-content:center;}
   .question-box{width:100%; height:calc(100% - 20px); margin-bottom:20px; display:flex; align-items:center; justify-content:center; background:rgba(58,45,120,.16); backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px); border:1px solid rgba(255,255,255,.4); border-radius:18px; padding:22px 24px; box-shadow:0 8px 22px rgba(20,10,50,.10), inset 0 1px 0 rgba(255,255,255,.3);}
   .question-box .question-text{width:100%; margin:0; color:#1A1333; text-align:left;}
@@ -342,7 +347,7 @@
   body.host-stage.host-reveal .opt:disabled:not(.reveal-correct){opacity:.45 !important;}
   body.host-stage .divider{margin:clamp(10px,1.6vh,18px) 0;}
   body.host-stage #answered-count{font-size:clamp(13px,1.6vh,16px); margin:clamp(8px,1.4vh,14px) 0;}
-  body.host-stage #force-end, body.host-stage #next-question{font-size:clamp(14px,1.8vh,18px); padding:clamp(12px,1.8vh,16px) 24px;}
+  body.host-stage #force-end{font-size:clamp(14px,1.8vh,18px); padding:clamp(12px,1.8vh,16px) 24px;}
   body.host-stage h3.center{font-size:clamp(18px,2.6vh,26px); margin:0 0 clamp(8px,1.4vh,14px);}
   body.host-stage .leader-row{padding:clamp(10px,1.6vh,16px) 18px; border-radius:14px; font-size:clamp(14px,1.8vh,18px); margin-bottom:clamp(6px,1.2vh,10px);}
   body.host-stage .leader-rank{font-size:clamp(15px,1.8vh,20px); width:38px;}
@@ -594,9 +599,9 @@ let state = { screen:"landing", role:null, code:"", hostToken:"", totalQuestions
   selectedIcon: ICON_OPTS[0], questionSets:[], playerName:"", timeIsUp:false,
   resultsStage:"reveal", previousLeaderboard:null, isFirstQuestion:true,
   myResults:null, iconMode:"choose", myScore:0,
-  lockedSetId: hostSetFromUrl || null, lockedSetInfo: null };
-let revealTimer = null, podiumTimer = null, autoNextTimer = null, previewTickHandle = null;
-let previewStart = 0, previewDuration = 5000;
+  lockedSetId: hostSetFromUrl || null, lockedSetInfo: null,
+  previewStartTime: null, previewDurationMs: 5000 };
+let revealTimer = null, podiumTimer = null, autoNextTimer = null;
 function clearAutoNextTimer(){ if(autoNextTimer){ clearTimeout(autoNextTimer); autoNextTimer = null; } }
 // Danh sach nguoi choi trong sanh cho gan nhat (tu socket "lobby:update"), luu lai de khung
 // phong to QR co the hien ngay khi mo, khong can cho su kien tiep theo moi co du lieu.
@@ -944,10 +949,17 @@ function viewQuestion(isHost){
 // that su, o cau hoi nay se "bay" ve dung vi tri cua no trong layout cau hoi+dap an (xem
 // hieu ung FLIP trong socket "game:question").
 function viewQuestionPreview(isHost){
+  // Dong ho CSS thuan (khong can JS tick): animation-duration = tong thoi gian xem truoc,
+  // animation-delay AM = da troi qua bao lau roi (0 neu vua bat dau, am neu resume giua chung
+  // sau khi mat ket noi) — nho vay thanh luon khop dung tien do con lai, chay muot bang GPU.
+  const dur = state.previewDurationMs || 5000;
+  const elapsed = state.previewStartTime ? Math.max(0, Date.now() - state.previewStartTime) : 0;
   return `<div class="card center preview-card">
   <div class="badge badge-dark">Câu ${state.currentIndex+1}/${state.totalQuestions}</div>
-  <div class="question-box"><div class="question-text">${formatRichText(state.question)}</div></div>
-  <p class="muted center">Câu trả lời sẽ mở sau <b id="preview-secs">5</b> giây…</p>
+  <div class="question-box">
+    <div class="question-text">${formatRichText(state.question)}</div>
+    <div class="preview-timebar" style="animation-duration:${dur}ms; animation-delay:${-elapsed}ms;"></div>
+  </div>
   </div>${!isHost ? playerScoreBarHtml() : ""}`;
 }
 // O co dinh o day man hinh nguoi choi: icon + ten + diem hien tai (chi hien khi la nguoi choi).
@@ -1008,14 +1020,13 @@ function viewReveal(isHost){
   </div>${!isHost ? playerScoreBarHtml() : ""}`;
 }
 function viewLeaderboardStage(isHost){
+  const isLastQuestion = state.currentIndex + 1 >= state.totalQuestions;
   return `<div class="card lb-card">
   <h3 class="center lb-title">Bảng xếp hạng</h3>
   <div class="lb-list" id="leaderboard"></div>
   <div class="lb-footer">
   <div class="divider"></div>
-  ${isHost
-    ? `<button class="primary block" id="next-question">${state.currentIndex+1<state.totalQuestions?"Câu tiếp theo":"Kết thúc trò chơi"}</button>`
-    : `<p class="muted center">Đang chờ host chuyển câu tiếp theo…</p>`}
+  <p class="muted center">${isLastQuestion ? "Đang chuyển sang phần vinh danh…" : "Đang chuyển sang câu tiếp theo…"}</p>
   </div>
   </div>${!isHost ? playerScoreBarHtml() : ""}`;
 }
@@ -1302,7 +1313,6 @@ function bind(){
   });
   b("start-game", ()=> socket.emit("host:start"));
   b("force-end", ()=> socket.emit("host:endQuestion"));
-  b("next-question", ()=>{ clearAutoNextTimer(); socket.emit("host:next"); });
   b("reveal-next", ()=>{
     const isLastQuestion = state.currentIndex + 1 >= state.totalQuestions;
     socket.emit(isLastQuestion ? "host:next" : "host:showLeaderboard");
@@ -1321,7 +1331,6 @@ function bind(){
       applyResume(res.resume, "player_wait");
       render();
       if(state.screen==="player_question") startTimerLoop();
-      if(state.screen==="player_question_preview") startPreviewCountdown();
     });
   });
   const codeInputEl = el("join-code");
@@ -1354,18 +1363,6 @@ function checkRoomIconMode(code){
     state.iconMode = (data && data.ok && data.iconMode==="random") ? "random" : "choose";
     if(state.screen==="player_join") render();
   }).catch(()=>{});
-}
-
-function startPreviewCountdown(){
-  if(previewTickHandle) clearInterval(previewTickHandle);
-  const tick = ()=>{
-    const remaining = previewStart + previewDuration - Date.now();
-    const secsEl = el("preview-secs");
-    if(secsEl) secsEl.textContent = Math.max(0, Math.ceil(remaining/1000));
-    if(remaining<=0 && previewTickHandle){ clearInterval(previewTickHandle); previewTickHandle=null; }
-  };
-  tick();
-  previewTickHandle = setInterval(tick, 250);
 }
 
 function startTimerLoop(){
@@ -1454,6 +1451,10 @@ function enterResultsStage(){
   if(state.role!=="host"){
     if(state.lastCorrect===true) Sound.sfx.correct();
     else if(state.lastCorrect===false) Sound.sfx.wrong();
+  } else {
+    // Man hinh host luon hien dap an DUNG (khong gan voi 1 nguoi choi cu the nao), nen phat
+    // tieng "correct" chung cho ca phong nghe khi dap an vua duoc cong bo.
+    Sound.sfx.correct();
   }
   const isLastQuestion = state.currentIndex + 1 >= state.totalQuestions;
   if(!state.explanation){
@@ -1480,7 +1481,7 @@ function applyResume(resume, fallbackScreen){
   if(resume.phase === "question_preview"){
     state.currentIndex = resume.index; state.totalQuestions = resume.total;
     state.question = resume.question;
-    previewStart = resume.startTime; previewDuration = resume.previewDuration;
+    state.previewStartTime = resume.startTime; state.previewDurationMs = resume.previewDuration;
     state.myScore = resume.myScore || 0;
     state.screen = state.role==="host" ? "host_question_preview" : "player_question_preview";
   } else if(resume.phase === "question"){
@@ -1537,10 +1538,9 @@ socket.on("room:closed", ()=>{
 socket.on("game:questionPreview", (data)=>{
   state.currentIndex = data.index; state.totalQuestions = data.total;
   state.question = data.question;
-  previewStart = data.startTime; previewDuration = data.previewDuration;
+  state.previewStartTime = data.startTime; state.previewDurationMs = data.previewDuration;
   state.screen = state.role==="host" ? "host_question_preview" : "player_question_preview";
   render();
-  startPreviewCountdown();
 });
 
 socket.on("game:question", (data)=>{
@@ -1566,6 +1566,14 @@ socket.on("game:question", (data)=>{
         { duration: 480, easing: "cubic-bezier(.34,1.2,.64,1)" }
       );
     }
+    // Lam muot them ca phan dap an: cac o hien ra lan luot (fade + truot len nhe) thay vi
+    // bat ngo xuat hien cung luc voi o cau hoi vua "bay" toi.
+    document.querySelectorAll(".qa-answers .opt").forEach((opt, i)=>{
+      opt.animate(
+        [{ opacity: 0, transform: "translateY(14px)" }, { opacity: 1, transform: "translateY(0)" }],
+        { duration: 380, delay: 140 + i*70, easing: "cubic-bezier(.34,1.2,.64,1)", fill: "backwards" }
+      );
+    });
   }
 });
 
@@ -1637,7 +1645,6 @@ socket.on("connect", ()=>{
       applyResume(res.resume, state.screen);
       render();
       if(state.screen==="player_question") startTimerLoop();
-      if(state.screen==="player_question_preview") startPreviewCountdown();
     });
   } else if(state.role==="host" && state.code && state.hostToken){
     // Socket bi rot tam thoi (mang chap chon, tai cao...) va vua ket noi lai — tu nhan
@@ -1648,7 +1655,6 @@ socket.on("connect", ()=>{
       applyResume(res.resume, state.screen);
       render();
       if(state.screen==="host_question") startTimerLoop();
-      if(state.screen==="host_question_preview") startPreviewCountdown();
     });
   }
 });
