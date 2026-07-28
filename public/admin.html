@@ -201,8 +201,11 @@
         <label style="display:flex; align-items:center; gap:10px; font-weight:400; cursor:pointer; margin-bottom:10px;">
           <input type="checkbox" id="link-opt-sa" style="width:18px; height:18px;"> Trộn thứ tự đáp án
         </label>
-        <label style="display:flex; align-items:center; gap:10px; font-weight:400; cursor:pointer;">
+        <label style="display:flex; align-items:center; gap:10px; font-weight:400; cursor:pointer; margin-bottom:10px;">
           <input type="checkbox" id="link-opt-ri" style="width:18px; height:18px;"> Chọn icon ngẫu nhiên cho người chơi
+        </label>
+        <label style="display:flex; align-items:center; gap:10px; font-weight:400; cursor:pointer;">
+          <input type="checkbox" id="link-opt-p5" style="width:18px; height:18px;"> Hiện Top 5 thay vì Top 3 ở bục vinh danh
         </label>
       </div>
       <div class="editor-footer">
@@ -392,6 +395,7 @@ function openLinkModal(id){
   $("link-opt-sq").checked = false;
   $("link-opt-sa").checked = false;
   $("link-opt-ri").checked = false;
+  $("link-opt-p5").checked = false;
   $("link-modal-overlay").style.display = "flex";
 }
 function closeLinkModal(){
@@ -403,7 +407,8 @@ async function generateAndCopyLink(){
   const sq = $("link-opt-sq").checked ? "1" : "0";
   const sa = $("link-opt-sa").checked ? "1" : "0";
   const ri = $("link-opt-ri").checked ? "1" : "0";
-  const link = `${location.origin}/?hostSet=${linkModalSetId}&sq=${sq}&sa=${sa}&ri=${ri}`;
+  const p5 = $("link-opt-p5").checked ? "1" : "0";
+  const link = `${location.origin}/?hostSet=${linkModalSetId}&sq=${sq}&sa=${sa}&ri=${ri}&p5=${p5}`;
   try{
     await navigator.clipboard.writeText(link);
     alert("Đã copy link vào bộ nhớ tạm:\n" + link);
